@@ -172,10 +172,10 @@ opt def p = p <|> return def
 
 parseProof :: Parser Proof
 parseProof = do
-  x <- opt Qed go
-  some parseNewline
-  parseQed
-  return x
+  go <|> parseQed
+  -- x <- opt Qed go
+  -- parseQed
+  -- return x
   where
     go = many parseSpace >> (parseSidedBuiltinRewrite <|> parseSidedRewrite <|> parseGoalRewrites)
     parseQed = parseKeyword "qed" >> return Qed
@@ -183,19 +183,19 @@ parseProof = do
     parseSidedBuiltinRewrite = do
       (side, re) <- parseSided parseBuiltinRewrite
       parseNewline
-      rest <- parseProof
+      rest <- parseQed <|> parseProof
       return $ ProofBuiltinRewrite side re rest
 
     parseSidedRewrite = do
       (side, re) <- parseSided parseRewrite
       parseNewline
-      rest <- parseProof
+      rest <- parseQed <|> parseProof
       return $ ProofRewrite side re rest
 
     parseGoalRewrites = do
       re <- parseGoalRewrite
       parseNewline
-      rest <- parseProof
+      rest <- parseQed <|> parseProof
       return $ ProofGoalRewrite re rest
 
 parseEquality :: Parser (Arith, Arith)
