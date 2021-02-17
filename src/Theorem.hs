@@ -40,6 +40,27 @@ arithNat :: Nat -> Arith
 arithNat NZ = Z
 arithNat (NS x) = S (arithNat x)
 
+arithNatToInteger :: NatF Arith -> Maybe Integer
+arithNatToInteger Z' = Just 0
+arithNatToInteger (S' (ArithNat x)) = fmap succ (arithNatToInteger x)
+arithNatToInteger _ = Nothing
+
+pprArith :: Arith -> String
+pprArith Z = "0"
+pprArith (ArithNat n@(S' x)) =
+  case arithNatToInteger n of
+    Nothing -> "S (" ++ pprArith x ++ ")"
+    Just i -> show i
+
+pprArith (Add x y) =
+  "(" ++ pprArith x ++ " + " ++ pprArith y ++ ")"
+
+pprArith (Mul x y) =
+  "(" ++ pprArith x ++ " * " ++ pprArith y ++ ")"
+
+pprEquality :: (Arith, Arith) -> String
+pprEquality (x, y) = pprArith x ++ " = " ++ pprArith y
+
 instance Num Arith where
   fromInteger 0 = Z
   fromInteger x
@@ -114,7 +135,7 @@ data GoalRewrite = GoalSym deriving (Show)
 checkEqPrf :: Theorem -> [Either GoalRewrite (GoalSide, Rewrite Arith)] -> Either String [Arith]
 checkEqPrf (x, y) []
   | x == y = Right [x]
-  | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ show (x, y)
+  | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ pprEquality (x, y)
 checkEqPrf (x, y) (Right (side, r):rs) =
   case runRewrite r getSide of
     Nothing -> Left "Rewrite failed"
