@@ -86,6 +86,11 @@ parseEndOfInput = Parser $ \case
   "" -> Right ("", ())
   _ -> Left "Expected end of input"
 
+parseEOF :: Parser ()
+parseEOF = do
+  many (parseNewline <|> parseSpace)
+  parseEndOfInput
+
 -- | Parse name characters occuring after the first character of a name
 parseNameChar :: Parser Char
 parseNameChar = parseAlphaUnderscore <|> parseDigit
@@ -230,7 +235,6 @@ parseTheorem = do
 parseDefs :: Parser [Def]
 parseDefs = do
   x <- parseTheorem
-  xs <- (parseNewline >> parseDefs) <|> fmap (const []) parseEndOfInput
+  xs <- (some parseNewline >> parseDefs) <|> fmap (const []) parseEOF
   return (x:xs)
-
 

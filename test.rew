@@ -1,0 +1,10 @@
+theorem test1 : (1 + 1) = 2
+proof
+  lhs: cbv
+qed
+
+theorem test2 : (2 * 4) = 7
+proof
+  lhs: cbv
+qed
+
