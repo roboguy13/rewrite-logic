@@ -216,7 +216,11 @@ parseTheorem = do
 
   (x, y) <- parseEquality
 
-  many (parseSpace <|> parseNewline)
+  some (parseSpace <|> parseNewline)
+
+  parseKeyword "proof"
+
+  some (parseSpace <|> parseNewline)
 
   proof <- parseProof
 
