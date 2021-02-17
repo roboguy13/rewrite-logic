@@ -108,83 +108,30 @@ fullCbv = rewrite $ \case
 
 type Theorem = (Arith, Arith)
 
-checkEqPrf :: Theorem -> [Rewrite Arith] -> Either String [Arith]
+data GoalSide = LHS | RHS deriving (Show)
+data GoalRewrite = GoalSym deriving (Show)
+
+checkEqPrf :: Theorem -> [Either GoalRewrite (GoalSide, Rewrite Arith)] -> Either String [Arith]
 checkEqPrf (x, y) []
   | x == y = Right [x]
   | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ show (x, y)
-checkEqPrf (x, y) (r:rs) =
-  case runRewrite r x of
+checkEqPrf (x, y) (Right (side, r):rs) =
+  case runRewrite r getSide of
     Nothing -> Left "Rewrite failed"
-    Just x' -> fmap (x:) (checkEqPrf (x', y) rs)
-
-
-fourPrf :: Either String [Arith]
-fourPrf = checkEqPrf (Add 2 2, 4) [cbvStep, cbvStep, cbvStep]
-
-
--- arithRewrite (ArithEqual x y) = rewrite $ \z ->
---   if z == x
---     then Just y
---     else Nothing
--- arithRewrite (ArithSym 
-
--- newtype Arith = Arith (ArithF NatF)
-
-
-
-
-{-
--- data Theorem a
---   = Axiom a
---   | TheoremRewrite (Theorem a) (Rewrite a)
-
-data Proof a
-  = AxiomProof a
-  | RewriteProof (Proof a) (Rewrite a)
-
--- data Nat = O | S Nat
-
--- type NatTheorem = Theorem Nat
-
-check :: Eq a => Rewrite a -> Proof a -> Maybe a
-check re (AxiomProof y) = runRewrite re y
-check re0 (RewriteProof prf re1) = do
-  x <- check re1 prf
-  case runRewrite re0 x of
-    Just y
-      | y == x -> Just y
-    _ -> Nothing
-
-check' :: Eq a => a -> Proof a -> Maybe a
-check' x = check (rewrite go)
+    Just z -> fmap (getSide:) (checkEqPrf (setSide z) rs)
   where
-    go y
-      | y == x = Just y
-      | otherwise = Nothing
+    getSide =
+      case side of
+        LHS -> x
+        RHS -> y
 
+    setSide z =
+      case side of
+        LHS -> (z, y)
+        RHS -> (x, z)
 
+checkEqPrf (x, y) (Left GoalSym:rs) = checkEqPrf (y, x) rs
 
-data NatAxiom
-  = NatAxiom Nat
-  | NatEq NatEq
-
-data NatEq
-  = NatEqRefl Nat
-  -- | NatEqTrans NatEq Nat
-  | NatEqSym NatEq
-
-data Nat
-  = O
-  | S Nat
-  | NatAdd Nat Nat
-  | NatMul Nat Nat
-
-add_nat :: Rewrite Nat
-add_nat = rewrite $ \case
-  NatAdd O y -> Just y
-  NatAdd (S x) y -> do
-    x' <- runRewrite add_nat (NatAdd x y)
-    Just $ S x'
-  _ -> Nothing
--}
+-- fourPrf :: Either String [Arith]
+-- fourPrf = checkEqPrf (Add 2 2, 4) [cbvStep, cbvStep, cbvStep]
 

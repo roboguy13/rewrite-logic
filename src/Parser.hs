@@ -45,10 +45,6 @@ instance Alternative Parser where
       (_, Right y) -> Right y
       (Left a, Left b) -> Left ("[" <> unlines [a <> ";", b] <> "]")
 
-data GoalSide = LHS | RHS deriving (Show)
-
-data GoalRewrite = GoalSym deriving (Show)
-
 data BuiltinRewrite = CbvStep | FullCbv deriving (Show)
 
 data Proof
@@ -60,7 +56,7 @@ data Proof
 
 data Def =
   TheoremDef String Theorem Proof
-  deriving Show
+  deriving (Show)
 
 parseCharWhen :: String -> (Char -> Bool) -> Parser Char
 parseCharWhen errStr f = Parser $ \case
@@ -84,6 +80,11 @@ parseNum = read <$> some parseDigit
 parseKeyword :: String -> Parser String
 parseKeyword [] = return ""
 parseKeyword (c:cs) = (:) <$> parseChar c <*> parseKeyword cs
+
+parseEndOfInput :: Parser ()
+parseEndOfInput = Parser $ \case
+  "" -> Right ("", ())
+  _ -> Left "Expected end of input"
 
 -- | Parse name characters occuring after the first character of a name
 parseNameChar :: Parser Char
@@ -204,7 +205,7 @@ parseEquality = do
   y <- parseArith
   return (x, y)
 
-parseTheorem :: Parser (Theorem, Proof)
+parseTheorem :: Parser Def
 parseTheorem = do
   parseKeyword "theorem"
   some parseSpace
@@ -224,5 +225,12 @@ parseTheorem = do
 
   proof <- parseProof
 
-  return ((x, y), proof)
+  return (TheoremDef name (x, y) proof)
+
+parseDefs :: Parser [Def]
+parseDefs = do
+  x <- parseTheorem
+  xs <- (parseNewline >> parseDefs) <|> fmap (const []) parseEndOfInput
+  return (x:xs)
+
 
