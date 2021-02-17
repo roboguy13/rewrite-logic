@@ -171,10 +171,10 @@ opt :: a -> Parser a -> Parser a
 opt def p = p <|> return def
 
 parseProof :: Parser Proof
-parseProof = do
-  go <|> parseQed
+parseProof = go <|> parseQed
   where
     go = many parseSpace >> (parseSidedBuiltinRewrite <|> parseSidedRewrite <|> parseGoalRewrites)
+
     parseQed = parseKeyword "qed" >> return Qed
 
     parseSidedBuiltinRewrite = do
