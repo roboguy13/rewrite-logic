@@ -132,13 +132,19 @@ type Theorem = (Arith, Arith)
 data GoalSide = LHS | RHS deriving (Show)
 data GoalRewrite = GoalSym deriving (Show)
 
+equalityToRewrite :: (Arith, Arith) -> Rewrite Arith
+equalityToRewrite (x, y) = rewriteWithErr (pprEquality (x, y)) $ \z ->
+  if z == x
+    then Just y
+    else Nothing
+
 checkEqPrf :: Theorem -> [Either GoalRewrite (GoalSide, Rewrite Arith)] -> Either String [Arith]
 checkEqPrf (x, y) []
   | x == y = Right [x]
   | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ pprEquality (x, y)
 checkEqPrf (x, y) (Right (side, r):rs) =
   case runRewrite r getSide of
-    Nothing -> Left "Rewrite failed"
+    Nothing -> Left (unlines ["Rewrite failed on " ++ show side ++ ": " ++ getRewriteErr r, "Final goal: " ++ pprEquality (x, y)])
     Just z -> fmap (getSide:) (checkEqPrf (setSide z) rs)
   where
     getSide =
