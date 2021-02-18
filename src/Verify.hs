@@ -53,7 +53,7 @@ verifyTheoremDef :: Def -> Verifier (Either String [ProofRewrite])
 verifyTheoremDef (TheoremDef name thm proof) = do
   res <- proofToRewrites proof
   case checkEqPrf thm res of
-    Left err -> return $ Left err
+    Left err -> return $ Left ("In theorem " <> name <> ":\n" <> err)
     Right _ -> return (Right res)
 
 verifyAndPushTheoremDef :: Def -> Verifier (Either String ())

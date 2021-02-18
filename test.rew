@@ -8,9 +8,15 @@ proof
   lhs: cbv
 qed
 
-theorem test3 : (2 * 4) = 8
+theorem test3 : (4 + 4) = 8
+proof
+  lhs: cbv
+qed
+
+theorem test4 : (2 * 4) = 8
 proof
   lhs: cbv_step
   lhs: one_td rewrite test2
+  lhs: rewrite test3
 qed
 

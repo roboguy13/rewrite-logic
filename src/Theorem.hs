@@ -49,7 +49,7 @@ pprArith :: Arith -> String
 pprArith Z = "0"
 pprArith (ArithNat n@(S' x)) =
   case arithNatToInteger n of
-    Nothing -> "S (" ++ pprArith x ++ ")"
+    Nothing -> "(S " ++ pprArith x ++ ")"
     Just i -> show i
 
 pprArith (Add x y) =
