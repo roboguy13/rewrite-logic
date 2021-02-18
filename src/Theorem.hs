@@ -61,6 +61,17 @@ pprArith (Mul x y) =
 pprEquality :: (Arith, Arith) -> String
 pprEquality (x, y) = pprArith x ++ " = " ++ pprArith y
 
+oneTD :: Rewrite Arith -> Rewrite Arith
+oneTD re = rewrite $ \z ->
+  case runRewrite re z of
+    Just z' -> Just z'
+    Nothing ->
+      case z of
+        ArithNat Z' -> Nothing
+        ArithNat (S' x) -> fmap (ArithNat . S') (runRewrite (oneTD re) x)
+        Add x y -> applyLR x y (oneTD re) Add
+        Mul x y -> applyLR x y (oneTD re) Mul
+
 instance Num Arith where
   fromInteger 0 = Z
   fromInteger x

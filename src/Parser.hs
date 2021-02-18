@@ -50,12 +50,17 @@ data BuiltinRewrite = CbvStep | FullCbv deriving (Show)
 data Proof
   = Qed
   | ProofBuiltinRewrite GoalSide BuiltinRewrite Proof
-  | ProofRewrite GoalSide String Proof
+  | ProofRewrite GoalSide ParsedRewrite Proof
   | ProofGoalRewrite GoalRewrite Proof
   deriving (Show)
 
 data Def =
   TheoremDef String Theorem Proof
+  deriving (Show)
+
+data ParsedRewrite
+  = BasicRewrite String
+  | OneTD String
   deriving (Show)
 
 parseCharWhen :: String -> (Char -> Bool) -> Parser Char
@@ -143,6 +148,13 @@ parseRewrite = do
   some parseSpace
   parseName
 
+parseRewrite' :: Parser ParsedRewrite
+parseRewrite' = do
+  one_td <- (parseKeyword "one_td" >> pure True) <|> pure False
+  if one_td
+    then fmap OneTD parseRewrite
+    else fmap BasicRewrite parseRewrite
+
 parseBuiltinRewrite :: Parser BuiltinRewrite
 parseBuiltinRewrite = parseCbvStep <|> parseFullCbv
   where
@@ -190,7 +202,7 @@ parseProof = go <|> parseQed
       return $ ProofBuiltinRewrite side re rest
 
     parseSidedRewrite = do
-      (side, re) <- parseSided parseRewrite
+      (side, re) <- parseSided parseRewrite'
       parseNewline
       rest <- parseProof
       return $ ProofRewrite side re rest
