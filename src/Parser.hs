@@ -150,7 +150,7 @@ parseRewrite = do
 
 parseRewrite' :: Parser ParsedRewrite
 parseRewrite' = do
-  one_td <- (parseKeyword "one_td" >> pure True) <|> pure False
+  one_td <- (parseKeyword "one_td" >> some parseSpace >> pure True) <|> pure False
   if one_td
     then fmap OneTD parseRewrite
     else fmap BasicRewrite parseRewrite

@@ -34,11 +34,17 @@ proofToRewrites (ProofBuiltinRewrite side builtin rest) = do
     CbvStep -> fmap (Right (side, cbvStep) :) (proofToRewrites rest)
     FullCbv -> fmap (Right (side, fullCbv) :) (proofToRewrites rest)
 
-proofToRewrites (ProofRewrite side name rest) = do
+proofToRewrites (ProofRewrite side (BasicRewrite name) rest) = do
   x <- lookupRewrite name
   case x of
     Nothing -> error $ "No such theorem: " <> name
     Just re -> fmap (Right (side, re):) (proofToRewrites rest)
+
+proofToRewrites (ProofRewrite side (OneTD name) rest) = do
+  x <- lookupRewrite name
+  case x of
+    Nothing -> error $ "No such theorem: " <> name
+    Just re -> fmap (Right (side, oneTD re):) (proofToRewrites rest)
 
 proofToRewrites (ProofGoalRewrite re rest) =
   fmap (Left re:) (proofToRewrites rest)

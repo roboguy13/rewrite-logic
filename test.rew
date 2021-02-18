@@ -11,6 +11,6 @@ qed
 theorem test3 : (2 * 4) = 8
 proof
   lhs: cbv_step
-  lhs: rewrite test2
+  lhs: one_td rewrite test2
 qed
 
