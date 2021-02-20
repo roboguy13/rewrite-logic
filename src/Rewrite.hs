@@ -34,6 +34,9 @@ instance Category Transform where
   id = Transform "" pure
   Transform eF f . Transform eG g = Transform ("{" ++ unlines [eF ++ ";", eG] ++ "}") (f <=< g)
 
+untilNothingR :: forall a. Rewrite a -> Rewrite a
+untilNothingR = rewrite . untilNothing
+
 untilNothing :: forall a. Rewrite a -> a -> Maybe a
 untilNothing (Transform _ f) x0 = do
   x <- f x0
