@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Theorem where
 
@@ -8,13 +9,15 @@ import           Rewrite
 import           Control.Applicative
 import           Data.Maybe (fromMaybe)
 
+import           Data.Data
+
 data FixF f = FixF (f (FixF f))
 
 -- data Theorem atom rule
 --   = Theorem (atom rule)
 --   deriving (Show)
 
-data NatF a = Z' | S' a deriving (Show, Eq)
+data NatF a = Z' | S' a deriving (Show, Eq, Data)
 
 type Nat = FixF NatF
 
@@ -24,11 +27,15 @@ pattern NZ = FixF Z'
 pattern NS :: Nat -> Nat
 pattern NS x = FixF (S' x)
 
+data BCKW a = BCKW_Val a | B | C | K | W | BCKW_App (BCKW a) (BCKW a)
+  deriving (Show, Eq)
+
 data Arith
   = ArithNat (NatF Arith)
+  -- | ArithBCKW (BCKW Arith)
   | Add Arith Arith
   | Mul Arith Arith
-  deriving (Show, Eq)
+  deriving (Show, Eq, Data)
 
 pattern Z :: Arith
 pattern Z = ArithNat Z'
@@ -61,16 +68,16 @@ pprArith (Mul x y) =
 pprEquality :: (Arith, Arith) -> String
 pprEquality (x, y) = pprArith x ++ " = " ++ pprArith y
 
-oneTD :: Rewrite Arith -> Rewrite Arith
-oneTD re = rewrite $ \z ->
-  case runRewrite re z of
-    Just z' -> Just z'
-    Nothing ->
-      case z of
-        ArithNat Z' -> Nothing
-        ArithNat (S' x) -> fmap (ArithNat . S') (runRewrite (oneTD re) x)
-        Add x y -> applyLR x y (oneTD re) Add
-        Mul x y -> applyLR x y (oneTD re) Mul
+-- oneTD :: Rewrite Arith -> Rewrite Arith
+-- oneTD re = rewrite $ \z ->
+--   case runRewrite re z of
+--     Just z' -> Just z'
+--     Nothing ->
+--       case z of
+--         ArithNat Z' -> Nothing
+--         ArithNat (S' x) -> fmap (ArithNat . S') (runRewrite (oneTD re) x)
+--         Add x y -> applyLR x y (oneTD re) Add
+--         Mul x y -> applyLR x y (oneTD re) Mul
 
 instance Num Arith where
   fromInteger 0 = Z
