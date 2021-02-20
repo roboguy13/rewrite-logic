@@ -4,11 +4,12 @@ module Verify where
 
 import           Rewrite
 import           Theorem
+import           Theory
 import           Parser
 
 import           Control.Monad.State
 
-type ProofRewrite = Either GoalRewrite (GoalSide, Rewrite Arith)
+-- type ProofRewrite = Either GoalRewrite (GoalSide, Rewrite Arith)
 -- type ProofRewrite = Rewrite Arith
 
 newtype Verifier a = Verifier { runVerifier :: State [(String, Rewrite Arith)] a }
@@ -27,32 +28,32 @@ insertRewrite name re = do
   assocs <- get
   put ((name, re):assocs)
 
-proofToRewrites :: Proof -> Verifier [ProofRewrite]
+proofToRewrites :: Proof -> Verifier [ProofStep Arith]
 proofToRewrites Qed = return []
 proofToRewrites (ProofBuiltinRewrite side builtin rest) = do
   case builtin of
-    CbvStep -> fmap (Right (side, cbvStep) :) (proofToRewrites rest)
-    FullCbv -> fmap (Right (side, fullCbv) :) (proofToRewrites rest)
+    CbvStep -> fmap (RewriteStep side cbvStep :) (proofToRewrites rest)
+    FullCbv -> fmap (RewriteStep side fullCbv :) (proofToRewrites rest)
 
 proofToRewrites (ProofRewrite side (BasicRewrite name) rest) = do
   x <- lookupRewrite name
   case x of
     Nothing -> error $ "No such theorem: " <> name
-    Just re -> fmap (Right (side, re):) (proofToRewrites rest)
+    Just re -> fmap (RewriteStep side re:) (proofToRewrites rest)
 
 proofToRewrites (ProofRewrite side (OneTD name) rest) = do
   x <- lookupRewrite name
   case x of
     Nothing -> error $ "No such theorem: " <> name
-    Just re -> fmap (Right (side, oneTD re):) (proofToRewrites rest)
+    Just re -> fmap (RewriteStep side (oneTD re):) (proofToRewrites rest)
 
-proofToRewrites (ProofGoalRewrite re rest) =
-  fmap (Left re:) (proofToRewrites rest)
+proofToRewrites (ProofEqRewrite re rest) =
+  fmap (EqStep re:) (proofToRewrites rest)
 
-verifyTheoremDef :: Def -> Verifier (Either String [ProofRewrite])
+verifyTheoremDef :: Def -> Verifier (Either String [ProofStep Arith])
 verifyTheoremDef (TheoremDef name thm proof) = do
   res <- proofToRewrites proof
-  case checkEqPrf thm res of
+  case checkEqProof thm res of
     Left err -> return $ Left ("In theorem " <> name <> ":\n" <> err)
     Right _ -> return (Right res)
 

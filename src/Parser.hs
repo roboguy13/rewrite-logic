@@ -4,6 +4,7 @@
 module Parser where
 
 import           Theorem
+import           Theory
 import           Rewrite
 
 import           Control.Monad
@@ -49,14 +50,14 @@ data BuiltinRewrite = CbvStep | FullCbv deriving (Show)
 
 data Proof
   = Qed
-  | ProofBuiltinRewrite GoalSide BuiltinRewrite Proof
-  | ProofRewrite GoalSide ParsedRewrite Proof
-  | ProofGoalRewrite GoalRewrite Proof
+  | ProofBuiltinRewrite EqSide BuiltinRewrite Proof
+  | ProofRewrite EqSide ParsedRewrite Proof
+  | ProofEqRewrite EqRewrite Proof
   deriving (Show)
 
 data Def =
-  TheoremDef String Theorem Proof
-  deriving (Show)
+  TheoremDef String (Equality Arith) Proof
+  -- deriving (Show)
 
 data ParsedRewrite
   = BasicRewrite String
@@ -166,14 +167,14 @@ parseBuiltinRewrite = parseCbvStep <|> parseFullCbv
       parseKeyword "cbv"
       return FullCbv
 
-parseGoalRewrite :: Parser GoalRewrite
-parseGoalRewrite = parseSym -- <|> parseTrans
+parseEqRewrite :: Parser EqRewrite
+parseEqRewrite = parseSym -- <|> parseTrans
   where
     parseSym = do
       parseKeyword "sym"
-      return GoalSym
+      return EqSym
 
-parseSided :: Parser a -> Parser (GoalSide, a)
+parseSided :: Parser a -> Parser (EqSide, a)
 parseSided p = lhs <|> rhs
   where
     lhs = do
@@ -191,7 +192,7 @@ opt def p = p <|> return def
 parseProof :: Parser Proof
 parseProof = go <|> parseQed
   where
-    go = many parseSpace >> (parseSidedBuiltinRewrite <|> parseSidedRewrite <|> parseGoalRewrites)
+    go = many parseSpace >> (parseSidedBuiltinRewrite <|> parseSidedRewrite <|> parseEqRewrites)
 
     parseQed = parseKeyword "qed" >> return Qed
 
@@ -207,11 +208,11 @@ parseProof = go <|> parseQed
       rest <- parseProof
       return $ ProofRewrite side re rest
 
-    parseGoalRewrites = do
-      re <- parseGoalRewrite
+    parseEqRewrites = do
+      re <- parseEqRewrite
       parseNewline
       rest <- parseProof
-      return $ ProofGoalRewrite re rest
+      return $ ProofEqRewrite re rest
 
 parseEquality :: Parser (Arith, Arith)
 parseEquality = do
@@ -242,7 +243,7 @@ parseTheorem = do
 
   proof <- parseProof
 
-  return (TheoremDef name (x, y) proof)
+  return (TheoremDef name (x :=: y) proof)
 
 parseDefs :: Parser [Def]
 parseDefs = do

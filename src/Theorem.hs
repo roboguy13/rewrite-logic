@@ -11,6 +11,8 @@ import           Data.Maybe (fromMaybe)
 
 import           Data.Data
 
+import           Theory
+
 data FixF f = FixF (f (FixF f))
 
 -- data Theorem atom rule
@@ -65,8 +67,11 @@ pprArith (Add x y) =
 pprArith (Mul x y) =
   "(" ++ pprArith x ++ " * " ++ pprArith y ++ ")"
 
-pprEquality :: (Arith, Arith) -> String
-pprEquality (x, y) = pprArith x ++ " = " ++ pprArith y
+instance Ppr Arith where
+  ppr = pprArith
+
+-- pprEquality :: (Arith, Arith) -> String
+-- pprEquality (x, y) = pprArith x ++ " = " ++ pprArith y
 
 -- oneTD :: Rewrite Arith -> Rewrite Arith
 -- oneTD re = rewrite $ \z ->
@@ -144,39 +149,4 @@ fullCbv :: Rewrite Arith
 fullCbv = rewrite $ \case
   ArithNat {} -> Nothing
   x -> untilNothing cbvStep x
-
-type Theorem = (Arith, Arith)
-
-data GoalSide = LHS | RHS deriving (Show)
-data GoalRewrite = GoalSym deriving (Show)
-
-equalityToRewrite :: (Arith, Arith) -> Rewrite Arith
-equalityToRewrite (x, y) = rewriteWithErr (pprEquality (x, y)) $ \z ->
-  if z == x
-    then Just y
-    else Nothing
-
-checkEqPrf :: Theorem -> [Either GoalRewrite (GoalSide, Rewrite Arith)] -> Either String [Arith]
-checkEqPrf (x, y) []
-  | x == y = Right [x]
-  | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ pprEquality (x, y)
-checkEqPrf (x, y) (Right (side, r):rs) =
-  case runRewrite r getSide of
-    Nothing -> Left (unlines ["Rewrite failed on " ++ show side ++ ": " ++ getRewriteErr r, "Final goal: " ++ pprEquality (x, y)])
-    Just z -> fmap (getSide:) (checkEqPrf (setSide z) rs)
-  where
-    getSide =
-      case side of
-        LHS -> x
-        RHS -> y
-
-    setSide z =
-      case side of
-        LHS -> (z, y)
-        RHS -> (x, z)
-
-checkEqPrf (x, y) (Left GoalSym:rs) = checkEqPrf (y, x) rs
-
--- fourPrf :: Either String [Arith]
--- fourPrf = checkEqPrf (Add 2 2, 4) [cbvStep, cbvStep, cbvStep]
 
