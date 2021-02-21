@@ -189,6 +189,9 @@ parseSided p = lhs <|> rhs
 opt :: a -> Parser a -> Parser a
 opt def p = p <|> return def
 
+notOneOf :: [Char] -> Parser Char
+notOneOf cs = parseCharWhen "notOneOf" (`notElem` cs)
+
 parseProof :: Parser Proof
 parseProof = go <|> parseQed
   where

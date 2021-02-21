@@ -49,8 +49,8 @@ checkEqProof eql@(x :=: y) (RewriteStep side r:rs) =
 
     setSide z =
       case side of
-        LHS -> (z :=: y)
-        RHS -> (x :=: z)
+        LHS -> z :=: y
+        RHS -> x :=: z
 checkEqProof (x :=: y) (EqStep EqSym:rs) = checkEqProof (y :=: x) rs
 
 equalityToRewrite :: (Eq a, Ppr a) => Equality a -> Rewrite a
