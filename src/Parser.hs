@@ -97,6 +97,12 @@ parseEOF = do
   many (parseNewline <|> parseSpace)
   parseEndOfInput
 
+parseFails :: Parser a -> Parser ()
+parseFails p = Parser $ \s ->
+  case runParser p s of
+    Left _ -> Right (s, ())
+    Right _ -> Left "parseFails"
+
 -- | Parse name characters occuring after the first character of a name
 parseNameChar :: Parser Char
 parseNameChar = parseAlphaUnderscore <|> parseDigit
