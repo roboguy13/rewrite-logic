@@ -53,11 +53,15 @@ parseMetaVar = fmap MetaVar parseMetaVar'
 
 parseJuxt :: Parser (Formula String)
 parseJuxt = fmap Juxt $
-  (:) <$> parseFormulaNonRec <*> some (parseSpace >> parseFormula)
+  (:) <$> parseFormulaNonRec <*> some (some parseSpace >> parseFormulaNonRec)
+  where
+    -- go = ((:) <$> parseFormulaNonRec <*> (some parseSpace >> go)) <|> return []
 
 parseAlts :: Parser (Formula String)
 parseAlts = fmap FormulaAlts $
-  (:) <$> parseFormulaNonRec <*> some (some parseSpace >> parseChar '|' >> some parseSpace >> parseFormula)
+  (:) <$> go <*> some (some parseSpace >> parseChar '|' >> some parseSpace >> go)
+  where
+    go = parseJuxt <|> parseFormulaNonRec
 
 parseEmpty :: Parser (Formula String)
 parseEmpty = do
@@ -70,7 +74,7 @@ parseFormulaNonRec = parseTerminal <|> parseEmpty <|> parseWhitespace <|> parseM
     parseWhitespace = parseKeyword "<whitespace>" >> return Whitespace
 
 parseFormula :: Parser (Formula String)
-parseFormula = parseFormulaNonRec <|> parseJuxt <|> parseAlts
+parseFormula = parseAlts <|> parseJuxt <|> parseFormulaNonRec
 
 parseProduction :: Parser (Production String)
 parseProduction = do
@@ -81,6 +85,9 @@ parseProduction = do
   some parseSpace
 
   wff <- parseFormula
+
+  many parseSpace
+  parseChar ';'
 
   return (Production name wff)
 

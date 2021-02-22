@@ -70,9 +70,9 @@ verifyDefs defs = fmap sequence_ $ mapM verifyAndPushTheoremDef defs
 
 fileParser :: Parser (Maybe (Theory String), [Def])
 fileParser = do
-  theory_maybe <- maybeParse (parseTheory >>= \th -> some parseNewline >> return th)
+  theory_maybe <- (parseTheory >>= \th -> some parseNewline >> return th)
   defs <- parseDefs
-  return (theory_maybe, defs)
+  return (Just theory_maybe, defs)
 
 verifyFile :: String -> IO ()
 verifyFile fileName = do

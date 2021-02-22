@@ -1,10 +1,10 @@
-begin theory testTheory
+begin theory nat
 
-<a> = <empty>
+<nat> = z | s <nat>;
 
 rules
 
-<a> ==> <a>
+<nat> ==> <nat>;
 
 end theory
 

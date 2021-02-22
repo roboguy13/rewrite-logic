@@ -75,6 +75,8 @@ parseRule = do
   parseKeyword "==>"
   some parseSpace
   wffB <- parseFormula
+  many parseSpace
+  parseChar ';'
   return (wffA :=: wffB)
 
 parseTheory :: Parser (Theory String)
