@@ -34,7 +34,12 @@ instance Ppr ErrorCtx where
       ]
 
 errorCtxCaret :: ErrorCtx -> String
-errorCtxCaret ctx = replicate (errColNum ctx) ' '
+errorCtxCaret ctx = replicate (errColNum ctx-1) ' ' ++ "^"
+
+showErrorLine :: [String] -> ErrorCtx -> String
+showErrorLine fileLines ctx =
+  "  " ++ (fileLines !! (errLineNum ctx - 1)) <> "\n" <>
+  "  " ++ errorCtxCaret ctx
 
 incrCol :: ErrorCtx -> ErrorCtx
 incrCol ctx = ctx { errColNum = errColNum ctx + 1 }
@@ -46,13 +51,13 @@ incrForChar :: ErrorCtx -> Char -> ErrorCtx
 incrForChar ctx '\n' = incrLine ctx
 incrForChar ctx _    = incrCol ctx
 
-execParser :: Parser a -> String -> Either ParseError a
+execParser :: Parser a -> String -> Either (ErrorCtx, ParseError) a
 execParser p s =
   case runParser p (initialErrorCtx, s) of
     (_, Right ("", x)) -> Right x
-    (ctx, Right (s, _)) -> Left $ "Incomplete parse\n" <> ppr ctx
+    (ctx, Right (s, _)) -> Left (ctx, "Incomplete parse\n" <> ppr ctx)
     -- Right (s, _) -> Left $ "Incomplete parse. Remaining string: " <> s
-    (ctx, Left err) -> Left $ "Parse error: " <> err <> "\n" <> ppr ctx
+    (ctx, Left err) -> Left (ctx, "Parse error: " <> err <> "\n" <> ppr ctx)
 
 instance Functor Parser where
   fmap f (Parser p) = Parser $ (fmap . fmap) (second f) . p
@@ -77,7 +82,7 @@ instance Alternative Parser where
     case (p (ctx, s), q (ctx, s)) of
       ((ctxP, Right x), _) -> (ctxP, Right x)
       (_, (ctxQ, Right y)) -> (ctxQ, Right y)
-      ((_, Left a), (_, Left b)) -> (ctx, Left a)
+      ((ctxP, Left a), (_, Left b)) -> (ctxP, Left a)
       -- ((_, Left a), (_, Left b)) -> (ctx, Left ("[" <> unlines [a <> ";", b] <> "]"))
 
 

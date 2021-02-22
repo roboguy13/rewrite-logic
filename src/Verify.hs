@@ -78,10 +78,11 @@ verifyFile :: String -> IO ()
 verifyFile fileName = do
   contents <- readFile fileName
   case execParser fileParser contents of
-    Left err -> putStrLn err
+    Left (ctx, err) -> putStrLn $ err <> "\n" <> showErrorLine (lines contents) ctx
     Right (theory_maybe, defs) -> do
       case execVerifier (verifyDefs defs) of
-        Left err -> putStrLn $ "Error: " <> err
+        Left err -> do
+          putStrLn $ "Error: " <> err
         Right () -> putStrLn "Correct."
       putStrLn "Theory:"
       print theory_maybe
