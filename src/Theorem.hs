@@ -1,10 +1,13 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE TupleSections #-}
 
 module Theorem where
 
 import           Rewrite
+import           Ppr
+import           Parser
 
 import           Control.Applicative
 import           Data.Maybe (fromMaybe)
@@ -150,3 +153,147 @@ fullCbv = rewrite $ \case
   ArithNat {} -> Nothing
   x -> untilNothing cbvStep x
 
+data BuiltinRewrite = CbvStep | FullCbv deriving (Show)
+
+data Proof
+  = Qed
+  | ProofBuiltinRewrite EqSide BuiltinRewrite Proof
+  | ProofRewrite EqSide ParsedRewrite Proof
+  | ProofEqRewrite EqRewrite Proof
+  deriving (Show)
+
+data Def =
+  TheoremDef String (Equality Arith) Proof
+  -- deriving (Show)
+
+data ParsedRewrite
+  = BasicRewrite String
+  | OneTD String
+  deriving (Show)
+parseAdd :: Parser Arith
+parseAdd = do
+  parseChar '('
+  (x, y) <- parseBinOp "+" parseArith parseArith
+  parseChar ')'
+  return $ Add x y
+
+parseMul :: Parser Arith
+parseMul = do
+  parseChar '('
+  (x, y) <- parseBinOp "*" parseArith parseArith
+  parseChar ')'
+  return $ Mul x y
+
+parseRewrite :: Parser String
+parseRewrite = do
+  parseKeyword "rewrite"
+  some parseSpace
+  parseName
+
+parseRewrite' :: Parser ParsedRewrite
+parseRewrite' = do
+  one_td <- (parseKeyword "one_td" >> some parseSpace >> pure True) <|> pure False
+  if one_td
+    then fmap OneTD parseRewrite
+    else fmap BasicRewrite parseRewrite
+
+parseBuiltinRewrite :: Parser BuiltinRewrite
+parseBuiltinRewrite = parseCbvStep <|> parseFullCbv
+  where
+    parseCbvStep = do
+      parseKeyword "cbv_step"
+      return CbvStep
+
+    parseFullCbv = do
+      parseKeyword "cbv"
+      return FullCbv
+
+parseEqRewrite :: Parser EqRewrite
+parseEqRewrite = parseSym -- <|> parseTrans
+  where
+    parseSym = do
+      parseKeyword "sym"
+      return EqSym
+
+parseSided :: Parser a -> Parser (EqSide, a)
+parseSided p = lhs <|> rhs
+  where
+    lhs = do
+      parseKeyword "lhs:"
+      some parseSpace
+      fmap (LHS,) p
+    rhs = do
+      parseKeyword "rhs:"
+      some parseSpace
+      fmap (RHS,) p
+
+
+parseArithNat :: Parser Arith
+parseArithNat = fmap fromInteger parseNum
+
+parseArith :: Parser Arith
+parseArith = parseArithNat <|> go
+  where
+    go = parseAdd <|> parseMul
+
+parseProof :: Parser Proof
+parseProof = go <|> parseQed
+  where
+    go = many parseSpace >> (parseSidedBuiltinRewrite <|> parseSidedRewrite <|> parseEqRewrites)
+
+    parseQed = parseKeyword "qed" >> return Qed
+
+    parseSidedBuiltinRewrite = do
+      (side, re) <- parseSided parseBuiltinRewrite
+      parseNewline
+      rest <- parseProof
+      return $ ProofBuiltinRewrite side re rest
+
+    parseSidedRewrite = do
+      (side, re) <- parseSided parseRewrite'
+      parseNewline
+      rest <- parseProof
+      return $ ProofRewrite side re rest
+
+    parseEqRewrites = do
+      re <- parseEqRewrite
+      parseNewline
+      rest <- parseProof
+      return $ ProofEqRewrite re rest
+
+parseEquality :: Parser (Arith, Arith)
+parseEquality = do
+  x <- parseArith
+  many parseSpace
+  parseChar '='
+  many parseSpace
+  y <- parseArith
+  return (x, y)
+
+parseTheorem :: Parser Def
+parseTheorem = do
+  parseKeyword "theorem"
+  some parseSpace
+  name <- parseName
+
+  many parseSpace
+  parseChar ':'
+  many parseSpace
+
+  (x, y) <- parseEquality
+
+  some (parseSpace <|> parseNewline)
+
+  parseKeyword "proof"
+
+  some (parseSpace <|> parseNewline)
+
+  proof <- parseProof
+
+  return (TheoremDef name (x :=: y) proof)
+
+parseDefs :: Parser [Def]
+parseDefs = do
+  x <- parseTheorem
+  xs <- (some parseNewline >> parseDefs) <|> fmap (const []) parseEOF
+  return (x:xs)

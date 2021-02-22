@@ -8,6 +8,7 @@ import           Theory
 import           Parser
 
 import           Control.Monad.State
+import           Control.Applicative
 
 -- type ProofRewrite = Either GoalRewrite (GoalSide, Rewrite Arith)
 -- type ProofRewrite = Rewrite Arith
@@ -67,13 +68,21 @@ verifyAndPushTheoremDef def@(TheoremDef name thm _) = do
 verifyDefs :: [Def] -> Verifier (Either String ())
 verifyDefs defs = fmap sequence_ $ mapM verifyAndPushTheoremDef defs
 
+fileParser :: Parser (Maybe (Theory String), [Def])
+fileParser = do
+  theory_maybe <- maybeParse (parseTheory >>= \th -> some parseNewline >> return th)
+  defs <- parseDefs
+  return (theory_maybe, defs)
+
 verifyFile :: String -> IO ()
 verifyFile fileName = do
   contents <- readFile fileName
-  case execParser parseDefs contents of
+  case execParser fileParser contents of
     Left err -> putStrLn err
-    Right defs -> do
+    Right (theory_maybe, defs) -> do
       case execVerifier (verifyDefs defs) of
         Left err -> putStrLn $ "Error: " <> err
         Right () -> putStrLn "Correct."
+      putStrLn "Theory:"
+      print theory_maybe
 

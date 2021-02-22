@@ -1,8 +1,15 @@
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+
 module Formula where
 
 import           Parser
+import           Ppr
 
 import           Control.Applicative
+
+import           Data.List
+
 
 data Formula a
   = Terminal String
@@ -11,13 +18,23 @@ data Formula a
   | Empty
   | Whitespace
   | MetaVar a
+  deriving (Eq, Show)
 
-data Production a = Production a (Formula a)
+instance Ppr (Formula String) where
+    ppr (Terminal t) = t
+    ppr (Juxt wffs) = unwords (map ppr wffs)
+    ppr (FormulaAlts alts) = unwords (intersperse "|" (map ppr alts))
+    ppr Empty = "<empty>"
+    ppr Whitespace = "<whitespace>"
+    ppr (MetaVar v) = '<' : ppr v ++ ">"
+
+data Production a = Production a (Formula a) deriving Show
 
 parseTerminal' :: Parser String
 parseTerminal' = do
-  parseFails parseMetaVar
-  some (notOneOf " \n\t\r=")
+  -- parseFails parseMetaVar
+  parseName
+  -- some (notOneOf " \n\t\r=")
 
 parseTerminal :: Parser (Formula a)
 parseTerminal = fmap Terminal parseTerminal'
@@ -25,7 +42,8 @@ parseTerminal = fmap Terminal parseTerminal'
 parseMetaVar' :: Parser String
 parseMetaVar' = do
   parseChar '<'
-  cs <- some (notOneOf " \n\t\r=")
+  cs <- parseName
+  -- cs <- some (notOneOf " \n\t\r=")
   -- parseTerminal'
   parseChar '>'
   return cs
@@ -35,7 +53,11 @@ parseMetaVar = fmap MetaVar parseMetaVar'
 
 parseJuxt :: Parser (Formula String)
 parseJuxt = fmap Juxt $
-  (:) <$> parseFormulaNonRec <*> many (parseSpace >> parseFormula)
+  (:) <$> parseFormulaNonRec <*> some (parseSpace >> parseFormula)
+
+parseAlts :: Parser (Formula String)
+parseAlts = fmap FormulaAlts $
+  (:) <$> parseFormulaNonRec <*> some (some parseSpace >> parseChar '|' >> some parseSpace >> parseFormula)
 
 parseEmpty :: Parser (Formula String)
 parseEmpty = do
@@ -43,12 +65,12 @@ parseEmpty = do
   return Empty
 
 parseFormulaNonRec :: Parser (Formula String)
-parseFormulaNonRec = parseTerminal <|> parseMetaVar <|> parseEmpty <|> parseWhitespace
+parseFormulaNonRec = parseTerminal <|> parseEmpty <|> parseWhitespace <|> parseMetaVar
   where
     parseWhitespace = parseKeyword "<whitespace>" >> return Whitespace
 
 parseFormula :: Parser (Formula String)
-parseFormula = parseFormulaNonRec <|> parseJuxt
+parseFormula = parseFormulaNonRec <|> parseJuxt <|> parseAlts
 
 parseProduction :: Parser (Production String)
 parseProduction = do
@@ -59,7 +81,6 @@ parseProduction = do
   some parseSpace
 
   wff <- parseFormula
-  parseNewline
 
   return (Production name wff)
 

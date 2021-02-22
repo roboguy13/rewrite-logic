@@ -1,3 +1,14 @@
+begin theory testTheory
+
+<a> = <empty>
+
+rules
+
+<a> ==> <a>
+
+end theory
+
+
 theorem test1 : (1 + 1) = 2
 proof
   lhs: cbv
