@@ -9,9 +9,9 @@ add z <nat> ==> <nat>;
 end theory
 
 
-heorem test1 : (1 + 1) = 2
+theorem test1 : (1 + 1) = 2
 proof
-  lhs: cbv
+  lhs: bv
 qed
 
 theorem test2 : (1 * 4) = 4

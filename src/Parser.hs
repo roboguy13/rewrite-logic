@@ -77,7 +77,8 @@ instance Alternative Parser where
     case (p (ctx, s), q (ctx, s)) of
       ((ctxP, Right x), _) -> (ctxP, Right x)
       (_, (ctxQ, Right y)) -> (ctxQ, Right y)
-      ((_, Left a), (_, Left b)) -> (ctx, Left ("[" <> unlines [a <> ";", b] <> "]"))
+      ((_, Left a), (_, Left b)) -> (ctx, Left a)
+      -- ((_, Left a), (_, Left b)) -> (ctx, Left ("[" <> unlines [a <> ";", b] <> "]"))
 
 
 parseCharWhen :: String -> (Char -> Bool) -> Parser Char
