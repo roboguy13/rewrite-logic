@@ -1,6 +1,6 @@
 begin theory nat
 
-<nat> = z | s <nat>;
+<nat> ::= z | s <nat>;
 
 rules
 
@@ -11,7 +11,7 @@ end theory
 
 theorem test1 : (1 + 1) = 2
 proof
-  lhs: bv
+  lhs: cbv
 qed
 
 theorem test2 : (1 * 4) = 4

@@ -81,7 +81,7 @@ parseProduction = do
   name <- parseMetaVar'
 
   some parseSpace
-  parseChar '='
+  parseKeyword "::="
   some parseSpace
 
   wff <- parseFormula
