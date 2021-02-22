@@ -4,12 +4,12 @@ begin theory nat
 
 rules
 
-<nat> ==> <nat>;
+add z <nat> ==> <nat>;
 
 end theory
 
 
-theorem test1 : (1 + 1) = 2
+heorem test1 : (1 + 1) = 2
 proof
   lhs: cbv
 qed
