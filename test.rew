@@ -1,12 +1,18 @@
 begin theory nat
 
-<nat> ::= z | s <nat>;
+    <nat> ::= z | s <nat>;
+    <add> ::= add ( <nat> ) ( <nat> );
+    <expr> ::= <nat> | <add> | s expr;
 
-rules
+  rules
 
-add z <nat> ==> <nat>;
+    add z z ==> z;
+
+    add z ?n ==> ?n;
+    add s <nospace> ?n ?m ==> s add ?n ?m;
 
 end theory
+
 
 
 theorem test1 : (1 + 1) = 2

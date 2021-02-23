@@ -16,7 +16,7 @@ data Formula a
   | Juxt [Formula a]
   | FormulaAlts [Formula a]
   | Empty
-  | Whitespace
+  | Space
   | MetaVar a
   deriving (Eq, Show)
 
@@ -25,10 +25,16 @@ instance Ppr (Formula String) where
     ppr (Juxt wffs) = unwords (map ppr wffs)
     ppr (FormulaAlts alts) = unwords (intersperse "|" (map ppr alts))
     ppr Empty = "<empty>"
-    ppr Whitespace = "<whitespace>"
+    ppr Space = "<space>"
     ppr (MetaVar v) = '<' : ppr v ++ ">"
 
 data Production a = Production a (Formula a) deriving Show
+
+data ParsedFormula a
+  = ParsedSymbol Char (ParsedFormula a)
+  | ParsedVar a (ParsedFormula a)
+  | ParsedSpace
+  | ParsedEmpty
 
 parseTerminal' :: Parser String
 parseTerminal' = do
@@ -71,7 +77,7 @@ parseEmpty = do
 parseFormulaNonRec :: Parser (Formula String)
 parseFormulaNonRec = parseTerminal <|> parseEmpty <|> parseWhitespace <|> parseMetaVar
   where
-    parseWhitespace = parseKeyword "<whitespace>" >> return Whitespace
+    parseWhitespace = parseKeyword "<space>" >> return Space
 
 parseFormula :: Parser (Formula String)
 parseFormula = parseAlts <|> parseJuxt <|> parseFormulaNonRec
