@@ -125,12 +125,13 @@ parseEOF = do
 --     Left _ -> Right (s, ())
 --     Right _ -> Left "parseFails"
 
--- | Parse name characters occuring after the first character of a name
+-- -- | Parse name characters occuring after the first character of a name
+
 parseNameChar :: Parser Char
-parseNameChar = parseAlphaUnderscore <|> parseDigit
+parseNameChar = parseAlphaUnderscore <|>  parseCharWhen (`elem` "{}()[]+-|*/%^<>") <|> parseDigit
 
 parseName :: Parser String
-parseName = (:) <$> parseAlphaUnderscore <*> go
+parseName = (:) <$> parseNameChar <*> go
   where
     go = many parseNameChar
 
