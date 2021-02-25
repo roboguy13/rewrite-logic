@@ -128,7 +128,7 @@ parseEOF = do
 -- -- | Parse name characters occuring after the first character of a name
 
 parseNameChar :: Parser Char
-parseNameChar = parseAlphaUnderscore <|>  parseCharWhen (`elem` "{}()[]+-|*/%^<>") <|> parseDigit
+parseNameChar = parseAlphaUnderscore <|>  parseCharWhen "special character" (`elem` "{}()[]+-|*/%^<>") <|> parseDigit
 
 parseName :: Parser String
 parseName = (:) <$> parseNameChar <*> go
