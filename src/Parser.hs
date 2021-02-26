@@ -128,7 +128,7 @@ parseEOF = do
 -- -- | Parse name characters occuring after the first character of a name
 
 parseNameChar :: Parser Char
-parseNameChar = parseAlphaUnderscore <|>  parseCharWhen "special character" (`elem` "{}()[]+-|*/%^<>") <|> parseDigit
+parseNameChar = parseAlphaUnderscore <|>  parseCharWhen "special character" (`elem` "{}()[]+-|*/%^") <|> parseDigit
 
 parseName :: Parser String
 parseName = (:) <$> parseNameChar <*> go
@@ -136,7 +136,7 @@ parseName = (:) <$> parseNameChar <*> go
     go = many parseNameChar
 
 parseSpace :: Parser Char
-parseSpace = (parseChar ' ' <|> parseChar '\t')
+parseSpace = parseChar ' ' <|> parseChar '\t' <|> parseNewline
 
 parseNewline :: Parser Char
 parseNewline = (parseChar '\n')
@@ -158,4 +158,7 @@ maybeParse p = fmap Just p <|> return Nothing
 
 notOneOf :: [Char] -> Parser Char
 notOneOf cs = parseCharWhen "notOneOf" (`notElem` cs)
+
+class Parseable a where
+  parse :: Parser a
 

@@ -6,10 +6,10 @@ begin theory nat
 
   rules
 
-    add z z ==> z;
+    add ( z ) ( z ) ==> z;
 
-    add z ?n ==> ?n;
-    add s <nospace> ?n ?m ==> s add ?n ?m;
+    add ( z ) ( ?n ) ==> ?n;
+    add ( s ?n ) ( ?m ) ==> s add ( ?n ) ( ?m );
 
 end theory
 

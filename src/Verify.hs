@@ -68,7 +68,7 @@ verifyAndPushTheoremDef def@(TheoremDef name thm _) = do
 verifyDefs :: [Def] -> Verifier (Either String ())
 verifyDefs defs = fmap sequence_ $ mapM verifyAndPushTheoremDef defs
 
-fileParser :: Parser (Maybe (Theory String), [Def])
+fileParser :: Parser (Maybe Theory, [Def])
 fileParser = do
   theory_maybe <- (parseTheory >>= \th -> some parseNewline >> return th)
   defs <- parseDefs

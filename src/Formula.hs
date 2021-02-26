@@ -20,6 +20,13 @@ data Formula a
   | MetaVar a
   deriving (Eq, Show)
 
+newtype FormulaMetaVar = FormulaMetaVar String deriving (Show)
+
+type Formula' = Formula FormulaMetaVar
+
+instance Parseable FormulaMetaVar where
+  parse = fmap FormulaMetaVar parseMetaVar'
+
 instance Ppr (Formula String) where
     ppr (Terminal t) = t
     ppr (Juxt wffs) = unwords (map ppr wffs)
@@ -28,7 +35,9 @@ instance Ppr (Formula String) where
     ppr Space = "<space>"
     ppr (MetaVar v) = '<' : ppr v ++ ">"
 
-data Production a = Production a (Formula a) deriving Show
+data Production a = Production String (Formula a) deriving Show
+
+type Production' = Production FormulaMetaVar
 
 data ParsedFormula a
   = ParsedSymbol Char (ParsedFormula a)
@@ -37,10 +46,7 @@ data ParsedFormula a
   | ParsedEmpty
 
 parseTerminal' :: Parser String
-parseTerminal' = do
-  -- parseFails parseMetaVar
-  parseName
-  -- some (notOneOf " \n\t\r=")
+parseTerminal' = parseName
 
 parseTerminal :: Parser (Formula a)
 parseTerminal = fmap Terminal parseTerminal'
@@ -48,41 +54,37 @@ parseTerminal = fmap Terminal parseTerminal'
 parseMetaVar' :: Parser String
 parseMetaVar' = do
   parseChar '<'
-  cs <- parseName
-  -- cs <- some (notOneOf " \n\t\r=")
-  -- parseTerminal'
+  cs <- some (parseAlphaUnderscore <|> parseDigit <|> parseChar '-')
   parseChar '>'
   return cs
 
-parseMetaVar :: Parser (Formula String)
-parseMetaVar = fmap MetaVar parseMetaVar'
+parseMetaVar :: Parseable a => Parser (Formula a)
+parseMetaVar = fmap MetaVar parse
 
-parseJuxt :: Parser (Formula String)
+parseJuxt :: Parseable a => Parser (Formula a)
 parseJuxt = fmap Juxt $
   (:) <$> parseFormulaNonRec <*> some (some parseSpace >> parseFormulaNonRec)
-  where
-    -- go = ((:) <$> parseFormulaNonRec <*> (some parseSpace >> go)) <|> return []
 
-parseAlts :: Parser (Formula String)
+parseAlts :: Parseable a => Parser (Formula a)
 parseAlts = fmap FormulaAlts $
   (:) <$> go <*> some (some parseSpace >> parseChar '|' >> some parseSpace >> go)
   where
     go = parseJuxt <|> parseFormulaNonRec
 
-parseEmpty :: Parser (Formula String)
+parseEmpty :: Parser (Formula a)
 parseEmpty = do
   parseKeyword "<empty>"
   return Empty
 
-parseFormulaNonRec :: Parser (Formula String)
+parseFormulaNonRec :: Parseable a => Parser (Formula a)
 parseFormulaNonRec = parseTerminal <|> parseEmpty <|> parseWhitespace <|> parseMetaVar
   where
     parseWhitespace = parseKeyword "<space>" >> return Space
 
-parseFormula :: Parser (Formula String)
+parseFormula :: Parseable a => Parser (Formula a)
 parseFormula = parseAlts <|> parseJuxt <|> parseFormulaNonRec
 
-parseProduction :: Parser (Production String)
+parseProduction :: Parseable a => Parser (Production a)
 parseProduction = do
   name <- parseMetaVar'
 

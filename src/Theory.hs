@@ -57,18 +57,29 @@ equalityToRewrite eql@(x :=: y) = rewriteWithErr (ppr eql) $ \z ->
     then Just y
     else Nothing
 
-data Theory a
+data RuleVar =
+  ProdVar String | RuleVar String
+  deriving (Show)
+
+data Theory' a
   = Theory
       { theoryName :: String
-      , theoryProductions :: [Production a]
+      , theoryProductions :: [Production']
       , theoryRules :: [Equality (Formula a)]
       }
     deriving Show
 
-theoryRewrites :: (Eq a, Ppr (Formula a)) => Theory a -> [Rewrite (Formula a)]
+type Theory = Theory' RuleVar
+
+theoryRewrites :: (Eq a, Ppr (Formula a)) => Theory' a -> [Rewrite (Formula a)]
 theoryRewrites th = map equalityToRewrite $ theoryRules th
 
-parseRule :: Parser (Equality (Formula String))
+instance Parseable RuleVar where
+  parse = fmap RuleVar ruleVar <|> fmap ProdVar parseMetaVar'
+    where
+      ruleVar = parseChar '?' >> some (parseAlphaUnderscore <|> parseDigit)
+
+parseRule :: Parser (Equality (Formula RuleVar))
 parseRule = do
   wffA <- parseFormula
   some parseSpace
@@ -79,25 +90,25 @@ parseRule = do
   parseChar ';'
   return (wffA :=: wffB)
 
-parseTheory :: Parser (Theory String)
+parseTheory :: Parser Theory
 parseTheory = do
   parseKeyword "begin theory"
   some parseSpace
   name <- parseName
-  some parseNewline
+  some parseSpace
 
   prods <- parseSection parseProduction
-  some parseNewline
+  some parseSpace
 
   parseKeyword "rules"
-  some parseNewline
+  some parseSpace
   rules <- parseSection parseRule
-  some parseNewline
+  some parseSpace
 
   parseKeyword "end theory"
   return (Theory name prods rules)
   where
-    parseSection p = (:) <$> (many parseSpace >> p) <*> many (some parseNewline >> many parseSpace >> p)
+    parseSection p = (:) <$> (many parseSpace >> p) <*> many (some parseSpace >> p)
 
 -- oneRewriteR :: Theory a => Rewrite a
 -- oneRewriteR = rewrite $ \x -> getFirst $ fold $ map (\r -> First $ runRewrite (oneTD r) x) rewriteRules
