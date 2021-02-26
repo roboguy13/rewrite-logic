@@ -5,7 +5,7 @@ begin theory nat
     <mul> ::= ( <expr> * <expr> );
     <expr> ::= <nat> | <add> | <mul> | s <expr>;
 
-  numeral notation <nat>
+  numeral notation <nat> z s
 
   rules
 

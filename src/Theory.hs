@@ -66,7 +66,7 @@ data Theory' a
       { theoryName :: String
       , theoryProductions :: [Production']
       , theoryRules :: [(String, Equality (Formula a))]
-      , theoryNumNotation :: Maybe String
+      , theoryNumNotation :: Maybe (String, String, String)
       }
     deriving Show
 
@@ -117,7 +117,15 @@ parseTheory = do
   return (Theory name prods rules numNotation_maybe)
   where
     parseSection p = (:) <$> (many parseSpace >> p) <*> many (some parseSpace >> p)
-    numNotation = parseKeyword "numeral notation" >> some parseSpace >> parseMetaVar'
+    numNotation = do
+      parseKeyword "numeral notation"
+      some parseSpace
+      prod <- parseMetaVar'
+      some parseSpace
+      z <- parseName
+      some parseSpace
+      s <- parseName
+      return (prod, z, s)
 
 -- oneRewriteR :: Theory a => Rewrite a
 -- oneRewriteR = rewrite $ \x -> getFirst $ fold $ map (\r -> First $ runRewrite (oneTD r) x) rewriteRules
