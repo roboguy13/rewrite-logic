@@ -1,12 +1,14 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 
-module Theory where
+module Theory.Theory where
 
 import           Rewrite
-import           Formula
+import           Theory.Formula
 import           Parser
 import           Ppr
+import           Theory.Type
+import           Theory.Wff
 
 import           Control.Applicative
 
@@ -18,7 +20,7 @@ import           Data.Foldable
 
 import           Data.Maybe (fromMaybe)
 
-data Equality a = a :=: a deriving Show
+import Debug.Trace
 
 data EqSide = LHS | RHS deriving (Show)
 data EqRewrite = EqSym deriving (Show)
@@ -27,9 +29,6 @@ data ProofStep a
   = EqStep      EqRewrite
   | RewriteStep EqSide (Rewrite a)
   -- deriving (Show)
-
-instance Ppr a => Ppr (Equality a) where
-  ppr (x :=: y) = unwords [ppr x, "=", ppr y]
 
 checkEqProof :: (Eq a, Ppr a) => Equality a -> [ProofStep a] -> Either String [a]
 checkEqProof eql@(x :=: y) []
@@ -51,47 +50,18 @@ checkEqProof eql@(x :=: y) (RewriteStep side r:rs) =
         RHS -> x :=: z
 checkEqProof (x :=: y) (EqStep EqSym:rs) = checkEqProof (y :=: x) rs
 
-equalityToRewrite :: (Eq a, Ppr a) => Equality a -> Rewrite a
-equalityToRewrite eql@(x :=: y) = rewriteWithErr (ppr eql) $ \z ->
-  if z == x
-    then Just y
-    else Nothing
-
-data RuleVar =
-  ProdVar String | RuleVar String
-  deriving (Show)
-
-data Theory' a
-  = Theory
-      { theoryName :: String
-      , theoryProductions :: [Production']
-      , theoryRules :: [(String, Equality (Formula a))]
-      , theoryNumNotation :: Maybe (String, String, String)
-      }
-    deriving Show
-
-type Theory = Theory' RuleVar
-
-theoryRewrites :: (Eq a, Ppr (Formula a)) => Theory' a -> [Rewrite (Formula a)]
-theoryRewrites th = map (equalityToRewrite . snd) $ theoryRules th
-
-instance Parseable RuleVar where
-  parse = fmap RuleVar ruleVar <|> fmap ProdVar parseMetaVar'
-    where
-      ruleVar = parseChar '?' >> some (parseAlphaUnderscore <|> parseDigit)
-
-parseRule :: Parser (String, (Equality (Formula RuleVar)))
-parseRule = do
+parseRule :: [Production'] ->  Parser (String, (Equality Wff))
+parseRule prods = do
   name <- some (parseAlphaUnderscore <|> parseDigit)
   many parseSpace
   parseChar ':'
   some parseSpace
 
-  wffA <- parseFormula
+  wffA <- parseWff prods
   some parseSpace
   parseKeyword "==>"
   some parseSpace
-  wffB <- parseFormula
+  wffB <- parseWff prods
   many parseSpace
   parseChar ';'
   return (name, (wffA :=: wffB))
@@ -110,7 +80,7 @@ parseTheory = do
 
   parseKeyword "rules"
   some parseSpace
-  rules <- parseSection parseRule
+  rules <- parseSection (parseRule prods)
   some parseSpace
 
   parseKeyword "end theory"
