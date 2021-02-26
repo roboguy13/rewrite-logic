@@ -65,22 +65,28 @@ data Theory' a
   = Theory
       { theoryName :: String
       , theoryProductions :: [Production']
-      , theoryRules :: [Equality (Formula a)]
+      , theoryRules :: [(String, Equality (Formula a))]
+      , theoryNumNotation :: Maybe String
       }
     deriving Show
 
 type Theory = Theory' RuleVar
 
 theoryRewrites :: (Eq a, Ppr (Formula a)) => Theory' a -> [Rewrite (Formula a)]
-theoryRewrites th = map equalityToRewrite $ theoryRules th
+theoryRewrites th = map (equalityToRewrite . snd) $ theoryRules th
 
 instance Parseable RuleVar where
   parse = fmap RuleVar ruleVar <|> fmap ProdVar parseMetaVar'
     where
       ruleVar = parseChar '?' >> some (parseAlphaUnderscore <|> parseDigit)
 
-parseRule :: Parser (Equality (Formula RuleVar))
+parseRule :: Parser (String, (Equality (Formula RuleVar)))
 parseRule = do
+  name <- some (parseAlphaUnderscore <|> parseDigit)
+  many parseSpace
+  parseChar ':'
+  some parseSpace
+
   wffA <- parseFormula
   some parseSpace
   parseKeyword "==>"
@@ -88,7 +94,7 @@ parseRule = do
   wffB <- parseFormula
   many parseSpace
   parseChar ';'
-  return (wffA :=: wffB)
+  return (name, (wffA :=: wffB))
 
 parseTheory :: Parser Theory
 parseTheory = do
@@ -100,15 +106,18 @@ parseTheory = do
   prods <- parseSection parseProduction
   some parseSpace
 
+  numNotation_maybe <- maybeParse (numNotation <* some parseSpace)
+
   parseKeyword "rules"
   some parseSpace
   rules <- parseSection parseRule
   some parseSpace
 
   parseKeyword "end theory"
-  return (Theory name prods rules)
+  return (Theory name prods rules numNotation_maybe)
   where
     parseSection p = (:) <$> (many parseSpace >> p) <*> many (some parseSpace >> p)
+    numNotation = parseKeyword "numeral notation" >> some parseSpace >> parseMetaVar'
 
 -- oneRewriteR :: Theory a => Rewrite a
 -- oneRewriteR = rewrite $ \x -> getFirst $ fold $ map (\r -> First $ runRewrite (oneTD r) x) rewriteRules

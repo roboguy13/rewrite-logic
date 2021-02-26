@@ -68,22 +68,22 @@ verifyAndPushTheoremDef def@(TheoremDef name thm _) = do
 verifyDefs :: [Def] -> Verifier (Either String ())
 verifyDefs defs = fmap sequence_ $ mapM verifyAndPushTheoremDef defs
 
-fileParser :: Parser (Maybe Theory, [Def])
+fileParser :: Parser ([Theory], [Def])
 fileParser = do
-  theory_maybe <- (parseTheory >>= \th -> some parseNewline >> return th)
+  theories <- some (many parseSpace >> parseTheory >>= \th -> some parseNewline >> return th)
   defs <- parseDefs
-  return (Just theory_maybe, defs)
+  return (theories, defs)
 
 verifyFile :: String -> IO ()
 verifyFile fileName = do
   contents <- readFile fileName
   case execParser fileParser contents of
     Left (ctx, err) -> putStrLn $ err <> "\n" <> showErrorLine (lines contents) ctx
-    Right (theory_maybe, defs) -> do
+    Right (theories, defs) -> do
       case execVerifier (verifyDefs defs) of
         Left err -> do
           putStrLn $ "Error: " <> err
         Right () -> putStrLn "Correct."
-      putStrLn "Theory:"
-      print theory_maybe
+      putStrLn "Theories:"
+      print theories
 

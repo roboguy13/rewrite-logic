@@ -1,19 +1,21 @@
 begin theory nat
 
     <nat> ::= z | s <nat>;
-    <add> ::= add ( <nat> ) ( <nat> );
-    <expr> ::= <nat> | <add> | s expr;
+    <add> ::= ( <expr> + <expr> );
+    <mul> ::= ( <expr> * <expr> );
+    <expr> ::= <nat> | <add> | <mul> | s <expr>;
+
+  numeral notation <nat>
 
   rules
 
-    add ( z ) ( z ) ==> z;
+    add_z: ( z + ?n ) ==> ?n;
+    add_s: ( s ?n + ?m ) ==> s ( ?n + ?m );
 
-    add ( z ) ( ?n ) ==> ?n;
-    add ( s ?n ) ( ?m ) ==> s add ( ?n ) ( ?m );
+    mul_z: ( z * ?n ) ==> z;
+    mul_s: ( s ?n * ?m ) ==> ( ?m + ( ?n * ?m ) );
 
 end theory
-
-
 
 theorem test1 : (1 + 1) = 2
 proof
