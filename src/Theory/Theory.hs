@@ -1,5 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE DeriveFunctor #-}
 
 module Theory.Theory where
 
@@ -18,6 +19,8 @@ import           Data.Generics.Uniplate.Data hiding (rewrite)
 import           Data.Monoid
 import           Data.Foldable
 
+import           Data.Profunctor
+
 import           Data.Maybe (fromMaybe)
 
 import Debug.Trace
@@ -30,14 +33,24 @@ data ProofStep a
   | RewriteStep EqSide (Rewrite a)
   -- deriving (Show)
 
-checkEqProof :: (Eq a, Ppr a) => Equality a -> [ProofStep a] -> Either String [a]
-checkEqProof eql@(x :=: y) []
-  | x == y = Right [x]
-  | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ ppr eql
+mapProofStep :: (b -> a) -> (a -> b) -> ProofStep a -> ProofStep b
+mapProofStep _ _ (EqStep r) = EqStep r
+mapProofStep f g (RewriteStep s r) = RewriteStep s (dimap f g r)
+
+checkEqProof :: (Unify a, Ppr a) => Equality a -> [ProofStep a] -> Either String [a]
+checkEqProof eql@(x :=: y) [] =
+  case unify x y of
+    Just _ -> Right [x]
+    Nothing -> Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ ppr eql
+  -- | x == y = Right [x]
+  -- | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ ppr eql
 checkEqProof eql@(x :=: y) (RewriteStep side r:rs) =
   case runRewrite r getSide of
     Nothing -> Left (unlines ["Rewrite failed on " ++ show side ++ ": " ++ getRewriteErr r, "Final goal: " ++ ppr eql])
-    Just z -> fmap (getSide:) (checkEqProof (setSide z) rs)
+    Just z ->
+      trace ("Rewriting " ++ ppr x ++ " ==to==> " ++ ppr z) $
+      -- trace ("  with " ++ ppr eql) $
+      fmap (getSide:) (checkEqProof (setSide z) rs)
   where
     getSide =
       case side of
@@ -57,11 +70,11 @@ parseRule prods = do
   parseChar ':'
   some parseSpace
 
-  wffA <- parseWff prods
+  wffA <- parseWff Nothing prods
   some parseSpace
   parseKeyword "==>"
   some parseSpace
-  wffB <- parseWff prods
+  wffB <- parseWff Nothing prods
   many parseSpace
   parseChar ';'
   return (name, (wffA :=: wffB))
@@ -95,7 +108,7 @@ parseTheory = do
       z <- parseName
       some parseSpace
       s <- parseName
-      return (prod, z, s)
+      return (NumProd prod z s)
 
 -- oneRewriteR :: Theory a => Rewrite a
 -- oneRewriteR = rewrite $ \x -> getFirst $ fold $ map (\r -> First $ runRewrite (oneTD r) x) rewriteRules
