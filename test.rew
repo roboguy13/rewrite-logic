@@ -17,9 +17,32 @@ begin theory nat
 
 end theory
 
-theorem test1 : ( 1 + 1 ) = 2
+theorem test1 : (1 + 1) = 2
 proof
-  lhs: rewrite add_s
-  lhs: one_td rewrite add_z
+  lhs: cbv
+qed
+
+theorem test2 : (1 * 4) = 4
+proof
+  lhs: cbv
+qed
+
+theorem test3 : (4 + 4) = 8
+proof
+  lhs: cbv
+qed
+
+theorem test4 : (2 * 4) = 8
+proof
+  lhs: cbv_step
+  lhs: one_td rewrite test2
+  lhs: rewrite test3
+qed
+
+theorem test5 : 3 = (2 + 1)
+proof
+  rhs: cbv_step
+  rhs: cbv_step
+  rhs: cbv_step
 qed
 

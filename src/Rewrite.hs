@@ -12,18 +12,11 @@ import           Control.Applicative
 import           Control.Monad.State
 
 import           Data.Data
-import           Data.Profunctor
 import           Data.Generics.Uniplate.Data hiding (rewrite)
 
 data Transform a b = Transform String (a -> Maybe b)
 
 type Rewrite a = Transform a a
-
-instance Profunctor Transform where
-  dimap f g (Transform s t) = Transform s (fmap g . t . f)
-
-instance Functor (Transform a) where
-  fmap f (Transform s t) = Transform s (fmap f . t)
 
 runRewrite :: Rewrite a -> a -> Maybe a
 runRewrite (Transform _ f) = f

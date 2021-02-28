@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Theory.Formula where
+module Formula where
 
 import           Parser
 import           Ppr
@@ -39,11 +39,11 @@ data Production a = Production String (Formula a) deriving Show
 
 type Production' = Production FormulaMetaVar
 
--- data ParsedFormula a
---   = ParsedSymbol Char (ParsedFormula a)
---   | ParsedVar a (ParsedFormula a)
---   | ParsedSpace
---   | ParsedEmpty
+data ParsedFormula a
+  = ParsedSymbol Char (ParsedFormula a)
+  | ParsedVar a (ParsedFormula a)
+  | ParsedSpace
+  | ParsedEmpty
 
 parseTerminal' :: Parser String
 parseTerminal' = parseName
@@ -98,9 +98,4 @@ parseProduction = do
   parseChar ';'
 
   return (Production name wff)
-
-lookupProduction :: [Production a] -> String -> Maybe (Formula a)
-lookupProduction ps name = lookup name (map prodToPair ps)
-  where
-    prodToPair (Production x y) = (x, y)
 

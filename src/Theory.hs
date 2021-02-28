@@ -1,15 +1,12 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveFunctor #-}
 
-module Theory.Theory where
+module Theory where
 
 import           Rewrite
-import           Theory.Formula
+import           Formula
 import           Parser
 import           Ppr
-import           Theory.Type
-import           Theory.Wff
 
 import           Control.Applicative
 
@@ -19,11 +16,9 @@ import           Data.Generics.Uniplate.Data hiding (rewrite)
 import           Data.Monoid
 import           Data.Foldable
 
-import           Data.Profunctor
-
 import           Data.Maybe (fromMaybe)
 
-import Debug.Trace
+data Equality a = a :=: a deriving Show
 
 data EqSide = LHS | RHS deriving (Show)
 data EqRewrite = EqSym deriving (Show)
@@ -33,24 +28,17 @@ data ProofStep a
   | RewriteStep EqSide (Rewrite a)
   -- deriving (Show)
 
-mapProofStep :: (b -> a) -> (a -> b) -> ProofStep a -> ProofStep b
-mapProofStep _ _ (EqStep r) = EqStep r
-mapProofStep f g (RewriteStep s r) = RewriteStep s (dimap f g r)
+instance Ppr a => Ppr (Equality a) where
+  ppr (x :=: y) = unwords [ppr x, "=", ppr y]
 
-checkEqProof :: (Unify a, Ppr a) => Equality a -> [ProofStep a] -> Either String [a]
-checkEqProof eql@(x :=: y) [] =
-  case unify x y of
-    Just _ -> Right [x]
-    Nothing -> Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ ppr eql
-  -- | x == y = Right [x]
-  -- | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ ppr eql
+checkEqProof :: (Eq a, Ppr a) => Equality a -> [ProofStep a] -> Either String [a]
+checkEqProof eql@(x :=: y) []
+  | x == y = Right [x]
+  | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ ppr eql
 checkEqProof eql@(x :=: y) (RewriteStep side r:rs) =
   case runRewrite r getSide of
     Nothing -> Left (unlines ["Rewrite failed on " ++ show side ++ ": " ++ getRewriteErr r, "Final goal: " ++ ppr eql])
-    Just z ->
-      trace ("Rewriting " ++ ppr x ++ " ==to==> " ++ ppr z) $
-      -- trace ("  with " ++ ppr eql) $
-      fmap (getSide:) (checkEqProof (setSide z) rs)
+    Just z -> fmap (getSide:) (checkEqProof (setSide z) rs)
   where
     getSide =
       case side of
@@ -63,18 +51,47 @@ checkEqProof eql@(x :=: y) (RewriteStep side r:rs) =
         RHS -> x :=: z
 checkEqProof (x :=: y) (EqStep EqSym:rs) = checkEqProof (y :=: x) rs
 
-parseRule :: [Production'] ->  Parser (String, (Equality Wff))
-parseRule prods = do
+equalityToRewrite :: (Eq a, Ppr a) => Equality a -> Rewrite a
+equalityToRewrite eql@(x :=: y) = rewriteWithErr (ppr eql) $ \z ->
+  if z == x
+    then Just y
+    else Nothing
+
+data RuleVar =
+  ProdVar String | RuleVar String
+  deriving (Show)
+
+data Theory' a
+  = Theory
+      { theoryName :: String
+      , theoryProductions :: [Production']
+      , theoryRules :: [(String, Equality (Formula a))]
+      , theoryNumNotation :: Maybe (String, String, String)
+      }
+    deriving Show
+
+type Theory = Theory' RuleVar
+
+theoryRewrites :: (Eq a, Ppr (Formula a)) => Theory' a -> [Rewrite (Formula a)]
+theoryRewrites th = map (equalityToRewrite . snd) $ theoryRules th
+
+instance Parseable RuleVar where
+  parse = fmap RuleVar ruleVar <|> fmap ProdVar parseMetaVar'
+    where
+      ruleVar = parseChar '?' >> some (parseAlphaUnderscore <|> parseDigit)
+
+parseRule :: Parser (String, (Equality (Formula RuleVar)))
+parseRule = do
   name <- some (parseAlphaUnderscore <|> parseDigit)
   many parseSpace
   parseChar ':'
   some parseSpace
 
-  wffA <- parseWff Nothing prods
+  wffA <- parseFormula
   some parseSpace
   parseKeyword "==>"
   some parseSpace
-  wffB <- parseWff Nothing prods
+  wffB <- parseFormula
   many parseSpace
   parseChar ';'
   return (name, (wffA :=: wffB))
@@ -93,7 +110,7 @@ parseTheory = do
 
   parseKeyword "rules"
   some parseSpace
-  rules <- parseSection (parseRule prods)
+  rules <- parseSection parseRule
   some parseSpace
 
   parseKeyword "end theory"
@@ -108,7 +125,7 @@ parseTheory = do
       z <- parseName
       some parseSpace
       s <- parseName
-      return (NumProd prod z s)
+      return (prod, z, s)
 
 -- oneRewriteR :: Theory a => Rewrite a
 -- oneRewriteR = rewrite $ \x -> getFirst $ fold $ map (\r -> First $ runRewrite (oneTD r) x) rewriteRules
