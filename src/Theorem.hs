@@ -14,7 +14,8 @@ import           Data.Maybe (fromMaybe)
 
 import           Data.Data
 
-import           Theory
+import           Theory.Theory
+import           Theory.Type
 
 data FixF f = FixF (f (FixF f))
 

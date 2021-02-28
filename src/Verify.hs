@@ -4,7 +4,8 @@ module Verify where
 
 import           Rewrite
 import           Theorem
-import           Theory
+import           Theory.Theory
+import           Theory.Type
 import           Parser
 
 import           Control.Monad.State

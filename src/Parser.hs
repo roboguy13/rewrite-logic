@@ -23,6 +23,9 @@ data ErrorCtx = ErrorCtx
 
 newtype Parser a = Parser { runParser :: (ErrorCtx, String) -> (ErrorCtx, Either ParseError (String, a)) }
 
+parseError :: String -> Parser a
+parseError str = Parser $ \ (ctx, _) -> (ctx, Left str)
+
 initialErrorCtx :: ErrorCtx
 initialErrorCtx = ErrorCtx 1 1
 
@@ -82,8 +85,8 @@ instance Alternative Parser where
     case (p (ctx, s), q (ctx, s)) of
       ((ctxP, Right x), _) -> (ctxP, Right x)
       (_, (ctxQ, Right y)) -> (ctxQ, Right y)
-      ((ctxP, Left a), (_, Left b)) -> (ctxP, Left a)
-      -- ((_, Left a), (_, Left b)) -> (ctx, Left ("[" <> unlines [a <> ";", b] <> "]"))
+      -- ((ctxP, Left a), (_, Left b)) -> (ctxP, Left a)
+      ((_, Left a), (_, Left b)) -> (ctx, Left ("[" <> unlines [a <> ";", b] <> "]"))
 
 
 parseCharWhen :: String -> (Char -> Bool) -> Parser Char
@@ -128,7 +131,7 @@ parseEOF = do
 -- -- | Parse name characters occuring after the first character of a name
 
 parseNameChar :: Parser Char
-parseNameChar = parseAlphaUnderscore <|>  parseCharWhen "special character" (`elem` "{}()[]+-|*/%^") <|> parseDigit
+parseNameChar = parseAlphaUnderscore <|>  parseCharWhen "special character" (`elem` "{}()[]+-*/%^") <|> parseDigit
 
 parseName :: Parser String
 parseName = (:) <$> parseNameChar <*> go
