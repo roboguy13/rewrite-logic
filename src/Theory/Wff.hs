@@ -9,10 +9,15 @@ import           Theory.Type
 
 import           Control.Applicative
 
-parseWff' :: [Production'] -> Formula' -> Parser Wff'
-parseWff' ps0 f = fmap WffRuleVar parseRuleVar <|> go f
+parseWff' :: Maybe NumProd -> [Production'] -> Formula' -> Parser Wff'
+parseWff' numProd ps0 f = parseNumProd <|> fmap WffRuleVar parseRuleVar <|> go f
   where
-    go' = parseWff' ps0
+    parseNumProd =
+      case numProd of
+        Just np -> parseTheoryNum' np
+        Nothing -> parseError "parseWff': no NumProd"
+
+    go' = parseWff' numProd ps0
 
     parseRuleVar :: Parser String
     parseRuleVar = parseChar '?' >> some (parseAlphaUnderscore <|> parseDigit)
@@ -36,11 +41,15 @@ parseWff' ps0 f = fmap WffRuleVar parseRuleVar <|> go f
         Nothing -> parseError ("Cannot find production named " <> p)
         Just rhs -> do
           wff <- go' rhs
-          return (WffWff (Wff p wff))
+          return wff
+          -- return (WffWff (Wff p wff))
 
 -- | XXX: Requires a non-empty theory
-parseWff :: [Production'] -> Parser Wff
-parseWff ps = foldr1 (<|>) $ map go ps
+parseWff :: Maybe NumProd -> [Production'] -> Parser Wff
+parseWff numProd ps = foldr1 (<|>) $ map go ps
   where
-    go (Production name p) = Wff <$> pure name <*> parseWff' ps p
+    go (Production name p) = Wff <$> pure name <*> parseWff' numProd ps p
+
+parseTheoryWff :: Theory -> Maybe NumProd -> Parser Wff
+parseTheoryWff th numProd = parseWff numProd (theoryProductions th)
 
