@@ -28,23 +28,26 @@ instance Functor (Transform a) where
 runRewrite :: Rewrite a -> a -> Maybe a
 runRewrite (Transform _ f) = f
 
-rewrite :: (a -> Maybe a) -> Rewrite a
-rewrite = Transform ""
+class Postprocess a where
+  postprocess :: a -> a
+
+-- rewrite :: Postprocess a => (a -> Maybe a) -> Rewrite a
+-- rewrite = Transform "" . (fmap postprocess .)
 
 getRewriteErr :: Rewrite a -> String
 getRewriteErr (Transform e _) = e
 
-rewriteWithErr :: String -> (a -> Maybe a) -> Rewrite a
-rewriteWithErr = Transform
+rewriteWithErr :: Postprocess a => String -> (a -> Maybe a) -> Rewrite a
+rewriteWithErr e = Transform e . (fmap postprocess .)
 
 instance Category Transform where
   id = Transform "" pure
   Transform eF f . Transform eG g = Transform ("{" ++ unlines [eF ++ ";", eG] ++ "}") (f <=< g)
 
-untilNothingR :: forall a. Rewrite a -> Rewrite a
-untilNothingR = rewrite . untilNothing
+untilNothingR :: forall a. Postprocess a => Rewrite a -> Rewrite a
+untilNothingR re = rewriteWithErr ("untilNothingR (" <> getRewriteErr re <> ")") $ untilNothing re
 
-untilNothing :: forall a. Rewrite a -> a -> Maybe a
+untilNothing :: forall a. Postprocess a => Rewrite a -> a -> Maybe a
 untilNothing (Transform _ f) x0 = do
   x <- f x0
   return $ go x
@@ -54,8 +57,8 @@ untilNothing (Transform _ f) x0 = do
         Nothing -> x
         Just x' -> go x'
 
-try :: Rewrite a -> Rewrite a
-try re = rewrite $ \z ->
+try :: Postprocess a => Rewrite a -> Rewrite a
+try re = rewriteWithErr ("try " <> getRewriteErr re) $ \z ->
   case runRewrite re z of
     Nothing -> Just z
     z' -> z'
@@ -91,8 +94,8 @@ doIfNoProgress f x = do
           put MadeProgress
           return x'
 
-oneTD :: forall a. Uniplate a => Rewrite a -> Rewrite a
-oneTD re = rewrite $ \z ->
+oneTD :: forall a. (Postprocess a, Uniplate a) => Rewrite a -> Rewrite a
+oneTD re = rewriteWithErr ("one_td (" <> getRewriteErr re <> ")") $ \z ->
   case runProgressM (go z) of
     (_, NoProgress) -> Nothing
     (r, MadeProgress) -> Just r

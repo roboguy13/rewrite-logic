@@ -37,11 +37,11 @@ mapProofStep :: (b -> a) -> (a -> b) -> ProofStep a -> ProofStep b
 mapProofStep _ _ (EqStep r) = EqStep r
 mapProofStep f g (RewriteStep s r) = RewriteStep s (dimap f g r)
 
-checkEqProof :: (Unify a, Ppr a) => Equality a -> [ProofStep a] -> Either String [a]
+checkEqProof :: (Show a, Unify a, Ppr a) => Equality a -> [ProofStep a] -> Either String [a]
 checkEqProof eql@(x :=: y) [] =
   case unify x y of
     Just _ -> Right [x]
-    Nothing -> Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ ppr eql
+    Nothing -> Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ show eql
   -- | x == y = Right [x]
   -- | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ ppr eql
 checkEqProof eql@(x :=: y) (RewriteStep side r:rs) =

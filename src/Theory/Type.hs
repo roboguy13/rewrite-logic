@@ -33,7 +33,7 @@ data Equality a = a :=: a deriving (Show, Functor)
 instance Ppr a => Ppr (Equality a) where
   ppr (x :=: y) = unwords [ppr x, "=", ppr y]
 
-equalityToRewrite :: (Eq a, Ppr a) => Equality a -> Rewrite a
+equalityToRewrite :: (Postprocess a, Eq a, Ppr a) => Equality a -> Rewrite a
 equalityToRewrite eql@(x :=: y) = rewriteWithErr (ppr eql) $ \z ->
   if z == x
     then Just y
@@ -60,8 +60,19 @@ data Wff'
   | WffEmpty
   | WffSpace
   -- | WffWff Wff
-  | WffRuleVar String
+  | WffRuleVar String Wff'
   deriving (Show, Data)
+
+-- Apply once, left-to-right
+oneLR :: Rewrite Wff' -> Rewrite Wff'
+oneLR re = rewriteWithErr ("oneLR (" <> getRewriteErr re <> ")") go
+  where
+    wffJuxtCons x (WffJuxt xs) = WffJuxt (x:xs)
+    wffJuxtCons x y = flattenWff' (WffJuxt [x, y])
+
+    go :: Wff' -> Maybe Wff'
+    go w@(WffJuxt (x:xs)) = runRewrite re w <|> fmap (wffJuxtCons x) (go (WffJuxt xs))
+    go w = runRewrite re w
 
 strength1 :: Functor f => (f a, b) -> f (a, b)
 strength1 (fa, b) = fmap (,b) fa
@@ -75,8 +86,14 @@ unify :: Unify a => a -> a -> Maybe (a, UnifyEnv a)
 unify = unifyWith mempty
 
 flattenWff' :: Wff' -> Wff'
-flattenWff' (WffJuxt (WffJuxt xs:ys)) = WffJuxt (xs ++ map flattenWff' ys)
-flattenWff' (WffJuxt (x:xs)) = WffJuxt (x : map flattenWff' xs)
+flattenWff' (WffJuxt (WffJuxt xs:ys)) =
+    case flattenWff' (WffJuxt (map flattenWff' xs)) of
+      WffJuxt xs' ->
+        case flattenWff' (WffJuxt (map flattenWff' ys)) of
+          WffJuxt ys' -> WffJuxt (xs' ++ ys')
+flattenWff' (WffJuxt (x:xs)) =
+  case flattenWff' (WffJuxt (map flattenWff' xs)) of
+    WffJuxt xs' -> WffJuxt (flattenWff' x : xs')
 flattenWff' x = x
 
 
@@ -96,17 +113,18 @@ instance Unify Wff' where
         zs <- sequence $ zipWith go xs ys
         let r = (:) <$> z <*> sequence zs
         return $ fmap WffJuxt r
-      go w@(WffRuleVar x) (WffRuleVar y)
-        | x == y = do
+      go w@(WffRuleVar x p) (WffRuleVar y q)
+        | x == y && isJust (unify p q) = do
             env <- get
             case lookup x env of
               Just z -> return $ Just z
               Nothing -> return $ Just w
         | otherwise = return Nothing  -- Basic unification here
-      go (WffRuleVar x) y = do
+      go (WffRuleVar x p) y = do
         env <- get
         case lookup x env of
-          Nothing -> do
+          Nothing ->
+            case unify p y of
             put ((x,y):env)
             return $ Just y
           Just z -> go y z
@@ -120,6 +138,8 @@ instance Unify Wff' where
           Nothing -> w
       go w = w
 
+instance Postprocess Wff' where
+  postprocess = flattenWff'
 
 -- instance Unify Wff' where
 --   unifyWith env (SimpleWff x) (SimpleWff y) = fmap go (unifyWith env x y)
