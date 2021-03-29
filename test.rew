@@ -9,23 +9,22 @@ begin theory nat
 
   rules
 
-    add_z ( z + <nat> ):
+    add_z ( z + <expr> ):
       ( z + ?n ) ==> ?n;
 
-    add_s ( s <nat> + <nat> ):
+    add_s ( s <expr> + <expr> ):
       ( s ?n + ?m ) ==> s ( ?n + ?m );
 
-    mul_z ( z * <nat> ):
+    mul_z ( z * <expr> ):
       ( z * ?n ) ==> z;
 
-    mul_s ( s <nat> * <nat> ):
+    mul_s ( s <expr> * <expr> ):
       ( s ?n * ?m ) ==> ( ?m + ( ?n * ?m ) );
 
 end theory
 
-theorem test1 : ( 1 + 1 ) = 2
+theorem test1 : ( s z + s z ) = s s z
 proof
-  lhs: rewrite add_s
   lhs: rewrite add_s
 qed
 

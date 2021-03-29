@@ -91,6 +91,7 @@ verifyFile fileName = do
   case execParser fileParser contents of
     Left (ctx, err) -> putStrLn $ err <> "\n" <> showErrorLine (lines contents) ctx
     Right (theories@(th:_), defs) -> do
+      putStrLn $ "theory: " ++ show th
       case execVerifier theories (verifyDefs th defs) of
         Left err -> do
           putStrLn $ "Error: " <> err

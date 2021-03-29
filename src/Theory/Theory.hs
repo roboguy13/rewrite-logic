@@ -94,7 +94,7 @@ parseTheory = do
 
   parseKeyword "rules"
   some parseSpace
-  rules <- parseSection parse
+  rules <- parseSection (parseWffRewrite numNotation_maybe prods)
   some parseSpace
 
   parseKeyword "end theory"
