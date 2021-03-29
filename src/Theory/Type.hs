@@ -86,7 +86,7 @@ instance Parseable WffRewrite where
 
     uenv <- case checkSchemeMatch scheme lhs0 of
               Left err -> parseError err
-              Right x -> return x
+              Right x -> traceM ("got uenv: " ++ show x) *> return x
 
     lhs <- case go uenv lhs0 of
              Left err -> parseError err
@@ -113,10 +113,11 @@ checkSchemeMatch fX fY = execStateT (go fX fY) []
   where
     go :: Formula' -> Formula UnifierVar -> StateT [(UnifierVar, FormulaMetaVar)] (Either String) ()
     go (Terminal a) (Terminal b) = when (a /= b) $ lift $ Left $ "In rewrite rule: the terminal from the scheme " ++ show a ++ " does not match the terminal from the LHS " ++ show b
-    go (Juxt xs) (Juxt ys)       = sequence_ $ map lift (zipWith checkSchemeMatch xs ys)
+    go (Juxt xs) (Juxt ys)       = sequence_ $ zipWith go xs ys
     go Empty Empty               = return ()
     go Space Space               = return ()
     go (MetaVar prodName) (MetaVar uvar) = do
+      traceM $ "Found uvar: " ++ ppr uvar
       env <- get
       case lookup uvar env of
         Just prodName'
@@ -127,7 +128,7 @@ checkSchemeMatch fX fY = execStateT (go fX fY) []
                       ,"  Second production: " ++ show prodName
                       ]
           | otherwise -> return ()
-        Nothing -> put ((uvar, prodName):env)
+        Nothing -> traceM "inserting uvar..." *> modify ((uvar, prodName) :)
 
     -- TODO: Add more informative error messages for these cases
     go _ _                       = lift $ Left "In rewrite rule: Scheme and LHS do not match"
