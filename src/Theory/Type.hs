@@ -92,7 +92,14 @@ instance Parseable WffRewrite where
              Left err -> parseError err
              Right x -> return $ WffRewriteLhs x
 
+    some parseSpace
+    parseKeyword "==>"
+    some parseSpace
+
     rhs <- parse :: Parser (Formula UnifierVar)
+
+    many parseSpace
+    parseChar ';'
 
     return (WffRewrite name lhs rhs)
 
