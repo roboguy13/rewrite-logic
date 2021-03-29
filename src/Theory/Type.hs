@@ -6,6 +6,9 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 -- {-# OPTIONS_GHC -Wall -Wno-unused-imports -Wno-unused-matches #-}
 
@@ -55,19 +58,19 @@ instance Ppr UnifierVar where
 instance Parseable UnifierVar where
   parse = parseChar '?' *> fmap UnifierVar parseName
 
-newtype WffRewriteLhs = WffRewriteLhs (Formula (String, UnifierVar))
-
--- instance Parseable WffRewriteLhs where
---   parse = 
-
--- instance Parseable WffRewriteLhs
+newtype WffRewriteLhs = WffRewriteLhs { getWffRewriteLhs :: Formula (String, UnifierVar) } deriving (Show)
 
 data WffRewrite =
   WffRewrite
     { wffRewriteName :: String
     , wffRewriteLhs :: WffRewriteLhs
     , wffRewriteRhs :: Formula UnifierVar
-    }
+    } deriving (Show)
+
+wffRewriteScheme :: WffRewrite -> Formula'
+wffRewriteScheme WffRewrite { wffRewriteLhs } = fmap go (getWffRewriteLhs wffRewriteLhs)
+  where
+    go (name, _) = FormulaMetaVar name
 
 instance Parseable WffRewrite where
   parse = do
@@ -81,19 +84,13 @@ instance Parseable WffRewrite where
 
     lhs0 <- parse :: Parser (Formula UnifierVar)
 
-    -- when (not (checkSchemeMatch scheme lhs0)) (parseError "Rewrite scheme and rewrite LHS do not match")
-
     uenv <- case checkSchemeMatch scheme lhs0 of
               Left err -> parseError err
               Right x -> return x
 
-    -- let lhs :: WffRewriteLhs
-    --     lhs = WffRewriteLhs $ go uenv $ lhs0
-
     lhs <- case go uenv lhs0 of
              Left err -> parseError err
              Right x -> return $ WffRewriteLhs x
-
 
     rhs <- parse :: Parser (Formula UnifierVar)
 
@@ -101,6 +98,11 @@ instance Parseable WffRewrite where
 
     where
       go :: [(UnifierVar, FormulaMetaVar)] -> Formula UnifierVar -> Either String (Formula (String, UnifierVar))
+      go uenv (Juxt xs) = Juxt <$> mapM (go uenv) xs
+      go uenv (FormulaAlts xs) = FormulaAlts <$> mapM (go uenv) xs
+      go _ (Terminal str) = return $ Terminal str
+      go _ Space = return Space
+      go _ Empty = return Empty
       go uenv (MetaVar uvar) =
         case lookup uvar uenv of
           Nothing -> Left $ "!!! Internal error: In rewrite rule: Cannot find UnifierVar " ++ ppr uvar ++ " in environment"
@@ -129,6 +131,7 @@ checkSchemeMatch fX fY = execStateT (go fX fY) []
 
     -- TODO: Add more informative error messages for these cases
     go _ _                       = lift $ Left "In rewrite rule: Scheme and LHS do not match"
+
 newtype UnifierEnv = UnifierEnv [(UnifierVar, Wff')]
 
 emptyUnifierEnv :: UnifierEnv
@@ -143,7 +146,7 @@ insertUnifierVar uv@(UnifierVar var) wff uenv@(UnifierEnv env) =
 lookupUnifierVar :: UnifierVar -> UnifierEnv -> Maybe Wff'
 lookupUnifierVar (UnifierVar var) (UnifierEnv env) = lookup var (coerce env)
 
-wffRewriteLhsParser :: Maybe NumProd -> [Production'] -> WffRewrite -> Either String (Parser (Wff', UnifierEnv))
+wffRewriteLhsParser :: Maybe NumProd -> [Production'] -> WffRewrite -> Either String (Parser (WffF UnifierVar, UnifierEnv))
 wffRewriteLhsParser numProd prods re =
     let WffRewriteLhs lhs = wffRewriteLhs re
     in
@@ -158,13 +161,13 @@ wffRewriteLhsParser numProd prods re =
       lift $ some parseSpace
       fmap (x:) (goJuxt ps)
 
-    go :: Formula (Production', UnifierVar) -> StateT UnifierEnv Parser Wff'
+    go :: Formula (Production', UnifierVar) -> StateT UnifierEnv Parser (WffF UnifierVar)
     go (Terminal str) = lift (WffTerminal <$> parseKeyword str)
     go Empty = return WffEmpty
     go Space = return WffSpace
     -- go Space = lift (some parseSpace *> return WffSpace)
     go (Juxt xs) = WffJuxt <$> goJuxt xs
-    go (FormulaAlts []) = error "wffRewriteLhsParser: Emmpty FormulaAlts list"
+    go (FormulaAlts []) = error "wffRewriteLhsParser: Empty FormulaAlts list"
     go (FormulaAlts xs) = foldr1 (<|>) $ map go xs
     go (MetaVar (p@(Production name prodF), unifierVar)) = do
       env <- get
@@ -175,14 +178,38 @@ wffRewriteLhsParser numProd prods re =
           | otherwise -> return ()
         Right env' -> put env'
 
-      return wff
+      return $ WffNamed unifierVar wff
 
-      -- case insertUnifierVar unifierVar p env of
-      --   Left (Production name' existingProdF)
-      --     | otherwise -> lift $ parseWff' numProd prods existingProdF
-      --   Right env' -> do
-      --     put env'
-      --     lift $ parseWff' numProd prods prodF
+wffRewritePerform :: UnifierEnv -> WffF UnifierVar -> Wff'
+wffRewritePerform uenv = go
+  where
+    go (WffTerminal str) = WffTerminal str
+    go (WffJuxt xs) = WffJuxt $ map go xs
+    go WffEmpty = WffEmpty
+    go WffSpace = WffSpace
+
+    go (WffNamed uvar _wff) =
+      case lookupUnifierVar uvar uenv of
+        Nothing -> error $ "!!! Internal error: wffRewritePerform: Cannot find UnifierVar " ++ ppr uvar ++ " in environment"
+        Just wff' -> wff'
+
+-- TODO: Propagate error messages upwards
+wffRewriteToRewrite0 :: Maybe NumProd -> [Production'] -> WffRewrite -> Rewrite String
+wffRewriteToRewrite0 numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \str ->
+  case wffRewriteLhsParser numProd prods re of
+    Left err -> Nothing
+    Right p ->
+      case execParser p str of
+        Left (errCtx, err) -> Nothing
+        Right (uwff, uenv) -> Just $ ppr (wffRewritePerform uenv uwff)
+
+wffRewriteToRewrite :: Maybe NumProd -> [Production'] -> WffRewrite -> Rewrite Wff'
+wffRewriteToRewrite numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \wff -> do
+  str <- runRewrite (wffRewriteToRewrite0 numProd prods re) (ppr wff)
+  case execParser (parseWff' numProd prods (wffRewriteScheme re)) str of
+    Left (errCtx, err) -> Nothing
+    Right wff' -> Just wff'
+
 
 parseWff' :: Maybe NumProd -> [Production'] -> Formula' -> Parser Wff'
 parseWff' numProd ps0 f = parseNumProd <|> go f
@@ -219,9 +246,6 @@ parseWff' numProd ps0 f = parseNumProd <|> go f
           return wff
           -- return (WffWff (Wff p wff))
 
--- wffRewriteToRewrite :: [Production'] -> WffRewrite -> Either String (Rewrite Wff')
--- wffRewriteToRewrite = undefined
-
 data WffVar a = WffVarName String | WffVarFilled a deriving (Show, Data, Functor, Traversable, Foldable)
 
 instance Applicative WffVar where
@@ -232,15 +256,16 @@ instance Monad WffVar where
   WffVarName v >>= _ = WffVarName v
   WffVarFilled x >>= f = f x
 
-data Wff'
+data WffF a
   = WffTerminal String
-  | WffJuxt [Wff']
-  -- | WffAlts [Wff']
+  | WffJuxt [WffF a]
   | WffEmpty
   | WffSpace
-  -- | WffWff Wff
-  -- | WffRuleVar String Wff'
-  deriving (Show, Data)
+  | WffNamed a Wff'
+  deriving (Show, Data, Eq)
+
+type Wff' = WffF Void
+
 
 -- Apply once, left-to-right
 oneLR :: Rewrite Wff' -> Rewrite Wff'
@@ -291,6 +316,11 @@ wffEqual x y = go (flattenWff' x) (flattenWff' y)
 instance Postprocess Wff' where
   postprocess = flattenWff'
 
+wff'EqToRewrite :: Theory' a -> Equality Wff' -> Rewrite Wff'
+wff'EqToRewrite th eql@(x :=: y) = rewriteWithErr (ppr eql) $ \z ->
+  if x == z
+    then Just y
+    else Nothing
 
 -- wff'EqToRewrite :: Theory' a -> Equality Wff' -> Rewrite Wff'
 -- wff'EqToRewrite th eql@(x :=: y) = rewriteWithErr (ppr eql) $ \z ->
@@ -342,7 +372,7 @@ data Theory' a
   = Theory
       { theoryName :: String
       , theoryProductions :: [Production']
-      , theoryRules :: [(String, Equality a)]
+      , theoryRules :: [WffRewrite]
       , theoryNumNotation :: Maybe NumProd
       }
     deriving Show

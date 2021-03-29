@@ -1,5 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Rewrite where
 
@@ -30,6 +32,9 @@ runRewrite (Transform _ f) = f
 
 class Postprocess a where
   postprocess :: a -> a
+
+instance Postprocess String where
+  postprocess = id
 
 -- rewrite :: Postprocess a => (a -> Maybe a) -> Rewrite a
 -- rewrite = Transform "" . (fmap postprocess .)

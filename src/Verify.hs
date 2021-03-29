@@ -18,7 +18,10 @@ newtype Verifier a = Verifier { runVerifier :: State [(String, Rewrite Wff')] a 
   deriving (Functor, Applicative, Monad, MonadState [(String, Rewrite Wff')])
 
 execVerifier :: [Theory] -> Verifier a -> a
-execVerifier ths = flip evalState (concatMap theoryRewrites ths) . runVerifier
+execVerifier ths = flip evalState (concatMap go ths) . runVerifier
+  where
+    go :: Theory -> [(String, Rewrite Wff')]
+    go th = map (\re -> (wffRewriteName re, wffRewriteToRewrite (theoryNumNotation th) (theoryProductions th) re)) (theoryRules th)
 
 lookupRewrite :: String -> Verifier (Maybe (Rewrite Wff'))
 lookupRewrite name = do

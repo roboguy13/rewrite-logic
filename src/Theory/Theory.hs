@@ -37,13 +37,14 @@ mapProofStep :: (b -> a) -> (a -> b) -> ProofStep a -> ProofStep b
 mapProofStep _ _ (EqStep r) = EqStep r
 mapProofStep f g (RewriteStep s r) = RewriteStep s (dimap f g r)
 
-checkEqProof :: (Show a, Unify a, Ppr a) => Equality a -> [ProofStep a] -> Either String [a]
-checkEqProof eql@(x :=: y) [] =
-  case unify x y of
-    Just _ -> Right [x]
-    Nothing -> Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ show eql
-  -- | x == y = Right [x]
-  -- | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ ppr eql
+checkEqProof :: (Show a, Eq a, Ppr a) => Equality a -> [ProofStep a] -> Either String [a]
+checkEqProof eql@(x :=: y) []
+  -- case unify x y of
+  --   Just _ -> Right [x]
+  --   Nothing -> Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ show eql
+
+  | x == y = Right [x]
+  | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ ppr eql
 checkEqProof eql@(x :=: y) (RewriteStep side r:rs) =
   case runRewrite r getSide of
     Nothing -> Left (unlines ["Rewrite failed on " ++ show side ++ ": " ++ getRewriteErr r, "Final goal: " ++ ppr eql])
@@ -63,21 +64,21 @@ checkEqProof eql@(x :=: y) (RewriteStep side r:rs) =
         RHS -> x :=: z
 checkEqProof (x :=: y) (EqStep EqSym:rs) = checkEqProof (y :=: x) rs
 
-parseRule :: [Production'] ->  Parser (String, (Equality Wff))
-parseRule prods = do
-  name <- some (parseAlphaUnderscore <|> parseDigit)
-  many parseSpace
-  parseChar ':'
-  some parseSpace
+-- parseRule :: [Production'] ->  Parser WffRewrite
+-- parseRule prods =
+  -- name <- some (parseAlphaUnderscore <|> parseDigit)
+  -- many parseSpace
+  -- parseChar ':'
+  -- some parseSpace
 
-  wffA <- parseWff Nothing prods
-  some parseSpace
-  parseKeyword "==>"
-  some parseSpace
-  wffB <- parseWff Nothing prods
-  many parseSpace
-  parseChar ';'
-  return (name, (wffA :=: wffB))
+  -- wffA <- parseWff Nothing prods
+  -- some parseSpace
+  -- parseKeyword "==>"
+  -- some parseSpace
+  -- wffB <- parseWff Nothing prods
+  -- many parseSpace
+  -- parseChar ';'
+  -- return (name, (wffA :=: wffB))
 
 parseTheory :: Parser Theory
 parseTheory = do
@@ -93,7 +94,7 @@ parseTheory = do
 
   parseKeyword "rules"
   some parseSpace
-  rules <- parseSection (parseRule prods)
+  rules <- parseSection parse
   some parseSpace
 
   parseKeyword "end theory"
