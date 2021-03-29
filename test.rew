@@ -26,6 +26,6 @@ end theory
 theorem test1 : ( 1 + 1 ) = 2
 proof
   lhs: rewrite add_s
-  lhs: one_td rewrite add_z
+  lhs: rewrite add_s
 qed
 

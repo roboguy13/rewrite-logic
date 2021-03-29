@@ -9,6 +9,7 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- {-# OPTIONS_GHC -Wall -Wno-unused-imports -Wno-unused-matches #-}
 
@@ -64,7 +65,7 @@ data WffRewrite =
   WffRewrite
     { wffRewriteName :: String
     , wffRewriteLhs :: WffRewriteLhs
-    , wffRewriteRhs :: Formula UnifierVar
+    , wffRewriteRhs :: WffF UnifierVar --Formula UnifierVar
     } deriving (Show)
 
 wffRewriteScheme :: WffRewrite -> Formula'
@@ -96,7 +97,7 @@ instance Parseable WffRewrite where
     parseKeyword "==>"
     some parseSpace
 
-    rhs <- parse :: Parser (Formula UnifierVar)
+    rhs <- parseWffF _ scheme
 
     many parseSpace
     parseChar ';'
@@ -209,7 +210,7 @@ wffRewriteToRewrite0 numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \
     Right p ->
       case execParser p str of
         Left (errCtx, err) -> Nothing
-        Right (uwff, uenv) -> Just $ ppr (wffRewritePerform uenv uwff)
+        Right (uwff, uenv) -> Just $ ppr (wffRewritePerform uenv (wffRewriteRhs re))
 
 wffRewriteToRewrite :: Maybe NumProd -> [Production'] -> WffRewrite -> Rewrite Wff'
 wffRewriteToRewrite numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \wff -> do
@@ -218,16 +219,10 @@ wffRewriteToRewrite numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \w
     Left (errCtx, err) -> Nothing
     Right wff' -> Just wff'
 
-
-parseWff' :: Maybe NumProd -> [Production'] -> Formula' -> Parser Wff'
-parseWff' numProd ps0 f = parseNumProd <|> go f
+parseWffF :: forall a b. (a -> Parser (WffF b)) -> Formula a -> Parser (WffF b)
+parseWffF parseMV f = go f
   where
-    parseNumProd =
-      case numProd of
-        Just np -> parseTheoryNum' np
-        Nothing -> parseError "parseWff': no NumProd"
-
-    go' = parseWff' numProd ps0
+    go' = parseWffF parseMV
 
     parseRuleVar :: Parser String
     parseRuleVar = parseChar '?' >> some (parseAlphaUnderscore <|> parseDigit)
@@ -239,20 +234,28 @@ parseWff' numProd ps0 f = parseNumProd <|> go f
       some parseSpace
       fmap (x:) (goJuxt ps)
 
-    go :: Formula' -> Parser Wff'
+    go :: Formula a -> Parser (WffF b)
     go (Terminal str) = WffTerminal <$> parseKeyword str
     go Empty = return WffEmpty
     go Space = return WffSpace
     go (Juxt xs) = WffJuxt <$> goJuxt xs
     go (FormulaAlts []) = error "parseWff': Empty FormulaAlts list"
     go (FormulaAlts xs) = foldr1 (<|>) $ map go' xs
-    go (MetaVar (FormulaMetaVar p)) =
+    go (MetaVar v) = parseMV v
+
+parseWff' :: Maybe NumProd -> [Production'] -> Formula' -> Parser Wff'
+parseWff' numProd ps0 f = parseNumProd <|>
+  parseWffF (\(FormulaMetaVar p) ->
       case lookupProduction ps0 p of
         Nothing -> parseError ("Cannot find production named " <> p)
         Just rhs -> do
-          wff <- go' rhs
-          return wff
-          -- return (WffWff (Wff p wff))
+          wff <- parseWff' numProd ps0 rhs
+          return wff) f
+  where
+    parseNumProd =
+      case numProd of
+        Just np -> parseTheoryNum' np
+        Nothing -> parseError "parseWff': no NumProd"
 
 data WffVar a = WffVarName String | WffVarFilled a deriving (Show, Data, Functor, Traversable, Foldable)
 
@@ -400,7 +403,7 @@ firstNumProd th =
       (numProd:_) -> Just numProd
       _ -> Nothing
 
-parseTheoryNum' :: NumProd -> Parser Wff'
+parseTheoryNum' :: NumProd -> Parser (WffF a)
 parseTheoryNum' (NumProd name z s) = do
   digits <- some parseDigit
   let num = read digits :: Int
