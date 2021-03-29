@@ -1,5 +1,8 @@
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 
 module Theory.Formula where
 
@@ -18,9 +21,9 @@ data Formula a
   | Empty
   | Space
   | MetaVar a
-  deriving (Eq, Show)
+  deriving (Eq, Show, Functor, Foldable, Traversable)
 
-newtype FormulaMetaVar = FormulaMetaVar String deriving (Show)
+newtype FormulaMetaVar = FormulaMetaVar { getFormulaMetaVar :: String } deriving (Show, Eq)
 
 type Formula' = Formula FormulaMetaVar
 
@@ -84,6 +87,9 @@ parseFormulaNonRec = parseTerminal <|> parseEmpty <|> parseWhitespace <|> parseM
 parseFormula :: Parseable a => Parser (Formula a)
 parseFormula = parseAlts <|> parseJuxt <|> parseFormulaNonRec
 
+instance Parseable a => Parseable (Formula a) where
+  parse = parseFormula
+
 parseProduction :: Parseable a => Parser (Production a)
 parseProduction = do
   name <- parseMetaVar'
@@ -101,6 +107,11 @@ parseProduction = do
 
 lookupProduction :: [Production a] -> String -> Maybe (Formula a)
 lookupProduction ps name = lookup name (map prodToPair ps)
+  where
+    prodToPair (Production x y) = (x, y)
+
+lookupProduction' :: [Production a] -> String -> Maybe (Production a)
+lookupProduction' ps name = fmap (Production name) $ lookup name (map prodToPair ps)
   where
     prodToPair (Production x y) = (x, y)
 

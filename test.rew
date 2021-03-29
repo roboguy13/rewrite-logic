@@ -9,16 +9,16 @@ begin theory nat
 
   rules
 
-    add_z rewriting ( z + <nat> ):
+    add_z ( z + <nat> ):
       ( z + ?n ) ==> ?n;
 
-    add_s rewriting ( s <nat> + <nat> ):
+    add_s ( s <nat> + <nat> ):
       ( s ?n + ?m ) ==> s ( ?n + ?m );
 
-    mul_z rewriting ( z * <nat> ):
+    mul_z ( z * <nat> ):
       ( z * ?n ) ==> z;
 
-    mul_s rewriting ( s <nat> * <nat> ):
+    mul_s ( s <nat> * <nat> ):
       ( s ?n * ?m ) ==> ( ?m + ( ?n * ?m ) );
 
 end theory

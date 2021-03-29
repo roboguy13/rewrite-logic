@@ -88,6 +88,9 @@ instance Alternative Parser where
       -- ((ctxP, Left a), (_, Left b)) -> (ctxP, Left a)
       ((_, Left a), (_, Left b)) -> (ctx, Left ("[" <> unlines [a <> ";", b] <> "]"))
 
+instance MonadPlus Parser where
+  mzero = empty
+  mplus = (<|>)
 
 parseCharWhen :: String -> (Char -> Bool) -> Parser Char
 parseCharWhen errStr f = Parser $ \case
