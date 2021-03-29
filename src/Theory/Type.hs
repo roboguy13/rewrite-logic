@@ -105,7 +105,7 @@ instance Parseable WffRewrite where
       go _ Empty = return Empty
       go uenv (MetaVar uvar) =
         case lookup uvar uenv of
-          Nothing -> Left $ "!!! Internal error: In rewrite rule: Cannot find UnifierVar " ++ ppr uvar ++ " in environment"
+          Nothing -> Left $ "!!! Internal error: In rewrite rule: Cannot find UnifierVar " ++ ppr uvar ++ " in environment " ++ show uenv
           Just x -> Right $ MetaVar (getFormulaMetaVar x, uvar)
 
 checkSchemeMatch :: Formula' -> Formula UnifierVar -> Either String [(UnifierVar, FormulaMetaVar)]
@@ -132,7 +132,7 @@ checkSchemeMatch fX fY = execStateT (go fX fY) []
     -- TODO: Add more informative error messages for these cases
     go _ _                       = lift $ Left "In rewrite rule: Scheme and LHS do not match"
 
-newtype UnifierEnv = UnifierEnv [(UnifierVar, Wff')]
+newtype UnifierEnv = UnifierEnv [(UnifierVar, Wff')] deriving Show
 
 emptyUnifierEnv :: UnifierEnv
 emptyUnifierEnv = UnifierEnv []
