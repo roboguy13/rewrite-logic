@@ -235,13 +235,29 @@ wffRewriteToRewrite0 numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \
         Left (errCtx, err) -> Nothing
         Right (uwff, uenv) -> Just $ ppr (wffRewritePerform uenv (wffRewriteRhs re))
 
-wffRewriteToRewrite :: Maybe NumProd -> [Production'] -> WffRewrite -> Rewrite Wff'
-wffRewriteToRewrite numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \wff -> do
+wffRewriteToRewrite :: Theory -> Maybe NumProd -> [Production'] -> WffRewrite -> Rewrite Wff'
+wffRewriteToRewrite th numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \wff -> do
   str <- runRewrite (wffRewriteToRewrite0 numProd prods re) (ppr wff)
-  case execParser (parseWff' numProd prods (wffRewriteScheme re)) str of
-    Left (errCtx, err) -> trace ("rewrite scheme: " <> show (wffRewriteScheme re) <> "\n  trying on: " <> show wff)
-      $ Nothing --error $ "wffRewriteToRewrite: " <> err
-    Right wff' -> Just wff'
+  case execParser (parseTheoryWff th numProd) str of
+    Left (errCtx, err) -> Nothing
+    Right wff' -> Just (wffParsed wff')
+  -- case (execParser . parseTheoryWff th numProd) of
+  --   Left (errCtx, err) -> trace ("rewrite scheme: " <> show (wffRewriteScheme re) <> "\n  trying on: " <> show wff <> "\n  err: " <> err <> "\n  orig str: " <> show str)
+  --     $ Nothing --error $ "wffRewriteToRewrite: " <> err
+  --   Right wff' -> trace "&&& success" $ Just wff'
+  -- case execParser (parseWff' numProd prods (wffRewriteScheme re)) str of
+  --   Left (errCtx, err) -> trace ("rewrite scheme: " <> show (wffRewriteScheme re) <> "\n  trying on: " <> show wff <> "\n  err: " <> err <> "\n  orig str: " <> show str)
+  --     $ Nothing --error $ "wffRewriteToRewrite: " <> err
+  --   Right wff' -> trace "&&& success" $ Just wff'
+
+-- | XXX: Requires a non-empty theory
+parseWff :: Maybe NumProd -> [Production'] -> Parser Wff
+parseWff numProd ps = foldr1 (<|>) $ map go ps
+  where
+    go (Production name p) = Wff <$> pure name <*> parseWff' numProd ps p
+
+parseTheoryWff :: Theory -> Maybe NumProd -> Parser Wff
+parseTheoryWff th numProd = parseWff numProd (theoryProductions th)
 
 parseWffF :: forall a b. (a -> Parser (WffF b)) -> Formula a -> Parser (WffF b)
 parseWffF parseMV f = go f

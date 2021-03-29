@@ -26,5 +26,6 @@ end theory
 theorem test1 : ( s z + s z ) = s s z
 proof
   lhs: rewrite add_s
+  lhs: one_td rewrite add_z
 qed
 
