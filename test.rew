@@ -47,5 +47,11 @@ proof
   lhs: rewrite add_s
   lhs: rewrite add_s
   lhs: rewrite add_z
+  lhs: rewrite add_s
+  lhs: rewrite add_s
+  lhs: rewrite add_z
+  lhs: rewrite add_s
+  lhs: rewrite add_s
+  lhs: rewrite add_z
 qed
 
