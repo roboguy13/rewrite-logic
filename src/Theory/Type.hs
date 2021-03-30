@@ -271,11 +271,13 @@ parseWff0 th_maybe res numProd prods = foldr1 (<|>) $ map go prods
             traceM $ "--- production:        " ++ ppr name
             traceM $ "--- potentialRewrites: " ++ show potentialRewrites
             wff <- parseWff'0 th_maybe res numProd prods p
-            case mapMaybe (\re -> runRewrite (goRewrite th re) wff) potentialRewrites of
-              [] -> Wff <$> pure name <*> pure wff
-              (wff':_) -> do
-                put MadeProgress
-                Wff <$> pure name <*> pure wff'
+            Wff <$> pure name <*>
+              flip doIfNoProgressM wff (\wff1 ->
+                case mapMaybe (\re -> runRewrite (goRewrite th re) wff1) potentialRewrites of
+                  [] -> pure Nothing
+                  (wff':_) -> do
+                    put MadeProgress
+                    pure $ Just wff')
       where
         potentialRewrites = map snd res --map snd $ filter ((== name) . fst) res
 
@@ -336,11 +338,12 @@ parseWff'0 th_maybe res numProd prods f = fmap flattenWff' $ lift parseNumProd <
           case th_maybe of
             Nothing -> pure wff
             Just th ->
-              case mapMaybe (\re -> runRewrite (goRewrite th re) wff) potentialRewrites of
-                [] -> pure wff
-                (wff':_) -> do
-                  put MadeProgress
-                  pure wff')
+              flip doIfNoProgressM wff (\wff1 ->
+                case mapMaybe (\re -> runRewrite (goRewrite th re) wff1) potentialRewrites of
+                  [] -> pure Nothing
+                  (wff':_) -> do
+                    put MadeProgress
+                    pure $ Just wff'))
           -- return wff) f
   where
     potentialRewrites = map snd res

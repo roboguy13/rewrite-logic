@@ -98,17 +98,21 @@ runProgressM (ProgressM p) = runState p NoProgress
 runProgressT :: Monad m => ProgressT m a -> m (a, Progress)
 runProgressT (ProgressM p) = runStateT p NoProgress
 
-doIfNoProgress :: (a -> Maybe a) -> (a -> ProgressM a)
-doIfNoProgress f x = do
+doIfNoProgressM :: Monad m => (a -> ProgressT m (Maybe a)) -> (a -> ProgressT m a)
+doIfNoProgressM f x = do
   p <- get
   case p of
     MadeProgress -> return x
-    NoProgress ->
-      case f x of
+    NoProgress -> do
+      z <- f x
+      case z of
         Nothing -> return x
         Just x' -> do
           put MadeProgress
           return x'
+
+doIfNoProgress :: Monad m => (a -> Maybe a) -> (a -> ProgressT m a)
+doIfNoProgress f = doIfNoProgressM (pure . f)
 
 oneTD :: forall a. (Postprocess a, Uniplate a) => Rewrite a -> Rewrite a
 oneTD re = rewriteWithErr ("one_td (" <> getRewriteErr re <> ")") $ \z ->

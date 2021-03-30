@@ -29,3 +29,23 @@ proof
   lhs: rewrite add_z
 qed
 
+theorem test2 : ( 3 + 1 ) = 4
+proof
+  lhs: rewrite add_s
+  lhs: rewrite add_s
+  lhs: rewrite add_s
+  lhs: rewrite add_z
+qed
+
+theorem test3 : ( 3 * 2 ) = 6
+proof
+  lhs: rewrite mul_s
+  lhs: rewrite mul_s
+  lhs: rewrite mul_s
+  lhs: rewrite mul_z
+
+  lhs: rewrite add_s
+  lhs: rewrite add_s
+  lhs: rewrite add_z
+qed
+
