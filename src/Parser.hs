@@ -57,9 +57,9 @@ incrForChar ctx _    = incrCol ctx
 execParser :: Parser a -> String -> Either (ErrorCtx, ParseError) a
 execParser p s =
   case runParser p (initialErrorCtx, s) of
-    (_, Right ("", x)) -> Right x
-    (ctx, Right (s, _)) -> Left (ctx, "Incomplete parse\n" <> ppr ctx)
-    -- Right (s, _) -> Left $ "Incomplete parse. Remaining string: " <> s
+    (_, Right (_, x)) -> Right x
+    -- (_, Right ("", x)) -> Right x
+    -- (ctx, Right (s, _)) -> Left (ctx, "Incomplete parse\n" <> ppr ctx)
     (ctx, Left err) -> Left (ctx, "Parse error: " <> err <> "\n" <> ppr ctx)
 
 instance Functor Parser where

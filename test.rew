@@ -9,16 +9,16 @@ begin theory nat
 
   rules
 
-    add_z ( z + <expr> ):
+    add_z <expr>, ( z + <expr> ):
       ( z + ?n ) ==> ?n;
 
-    add_s ( s <expr> + <expr> ):
+    add_s <expr>, ( s <expr> + <expr> ):
       ( s ?n + ?m ) ==> s ( ?n + ?m );
 
-    mul_z ( z * <expr> ):
+    mul_z <expr>, ( z * <expr> ):
       ( z * ?n ) ==> z;
 
-    mul_s ( s <expr> * <expr> ):
+    mul_s <expr>, ( s <expr> * <expr> ):
       ( s ?n * ?m ) ==> ( ?m + ( ?n * ?m ) );
 
 end theory
@@ -26,6 +26,6 @@ end theory
 theorem test1 : ( s z + s z ) = s s z
 proof
   lhs: rewrite add_s
-  lhs: one_td rewrite add_z
+  lhs: rewrite add_z
 qed
 

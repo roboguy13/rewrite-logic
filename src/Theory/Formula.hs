@@ -42,6 +42,9 @@ data Production a = Production String (Formula a) deriving Show
 
 type Production' = Production FormulaMetaVar
 
+isInterchangeableProduction :: [Production'] -> FormulaMetaVar -> FormulaMetaVar -> Bool
+isInterchangeableProduction prods mvarA mvarB = undefined
+
 -- data ParsedFormula a
 --   = ParsedSymbol Char (ParsedFormula a)
 --   | ParsedVar a (ParsedFormula a)

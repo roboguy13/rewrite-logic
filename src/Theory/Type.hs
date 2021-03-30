@@ -64,6 +64,7 @@ newtype WffRewriteLhs = WffRewriteLhs { getWffRewriteLhs :: Formula (String, Uni
 data WffRewrite =
   WffRewrite
     { wffRewriteName :: String
+    , wffRewriteProduction :: String
     , wffRewriteLhs :: WffRewriteLhs
     , wffRewriteRhs :: Formula UnifierVar
     } deriving (Show)
@@ -78,6 +79,14 @@ wffRewriteScheme WffRewrite { wffRewriteLhs } = fmap go (getWffRewriteLhs wffRew
 parseWffRewrite :: Maybe NumProd -> [Production'] -> Parser WffRewrite
 parseWffRewrite numProd prods = do
   name <- parseName
+
+  some parseSpace
+
+  prod <- parseMetaVar'
+
+  many parseSpace
+
+  parseChar ','
 
   some parseSpace
 
@@ -114,7 +123,7 @@ parseWffRewrite numProd prods = do
   many parseSpace
   parseChar ';'
 
-  return (WffRewrite name lhs rhs)
+  return (WffRewrite name prod lhs rhs)
 
   where
     go :: [(UnifierVar, FormulaMetaVar)] -> Formula UnifierVar -> Either String (Formula (String, UnifierVar))
@@ -235,12 +244,6 @@ wffRewriteToRewrite0 numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \
         Left (errCtx, err) -> Nothing
         Right (uwff, uenv) -> Just $ ppr (wffRewritePerform uenv (wffRewriteRhs re))
 
-wffRewriteToRewrite :: Theory -> Maybe NumProd -> [Production'] -> WffRewrite -> Rewrite Wff'
-wffRewriteToRewrite th numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \wff -> do
-  str <- runRewrite (wffRewriteToRewrite0 numProd prods re) (ppr wff)
-  case execParser (parseTheoryWff th numProd) str of
-    Left (errCtx, err) -> Nothing
-    Right wff' -> Just (wffParsed wff')
   -- case (execParser . parseTheoryWff th numProd) of
   --   Left (errCtx, err) -> trace ("rewrite scheme: " <> show (wffRewriteScheme re) <> "\n  trying on: " <> show wff <> "\n  err: " <> err <> "\n  orig str: " <> show str)
   --     $ Nothing --error $ "wffRewriteToRewrite: " <> err
@@ -251,31 +254,70 @@ wffRewriteToRewrite th numProd prods re = rewriteWithErr "wffRewriteToRewrite" $
   --   Right wff' -> trace "&&& success" $ Just wff'
 
 -- | XXX: Requires a non-empty theory
-parseWff :: Maybe NumProd -> [Production'] -> Parser Wff
-parseWff numProd ps = foldr1 (<|>) $ map go ps
+parseWff0 :: Maybe Theory -> [(String, WffRewrite)] -> Maybe NumProd -> [Production'] -> ProgressT Parser Wff
+parseWff0 th_maybe res numProd prods = foldr1 (<|>) $ map go prods
   where
-    go (Production name p) = Wff <$> pure name <*> parseWff' numProd ps p
+    goRewrite :: Theory -> WffRewrite -> Rewrite Wff'
+    goRewrite th re = rewriteWithErr "wffRewriteToRewrite" $ \wff -> do
+      str <- runRewrite (wffRewriteToRewrite0 numProd prods re) (ppr wff)
+      case execParser (parseTheoryWff th numProd) str of
+        Left (errCtx, err) -> Nothing
+        Right wff' -> Just (wffParsed wff')
+
+    go (Production name p) =
+        case th_maybe of
+          Nothing -> Wff <$> pure name <*> parseWff'0 th_maybe res numProd prods p
+          Just th -> do
+            traceM $ "--- production:        " ++ ppr name
+            traceM $ "--- potentialRewrites: " ++ show potentialRewrites
+            wff <- parseWff'0 th_maybe res numProd prods p
+            case mapMaybe (\re -> runRewrite (goRewrite th re) wff) potentialRewrites of
+              [] -> Wff <$> pure name <*> pure wff
+              (wff':_) -> do
+                put MadeProgress
+                Wff <$> pure name <*> pure wff'
+      where
+        potentialRewrites = map snd res --map snd $ filter ((== name) . fst) res
+
+-- TODO: Avoid duplicated processing effort
+wffRewriteToRewrite :: Theory -> Maybe NumProd -> [Production'] -> WffRewrite -> Rewrite Wff'
+wffRewriteToRewrite th numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \wff -> do
+  traceM $ "ppr'd = " ++ ppr wff
+  case execParser (execWffRewrite th re numProd prods) (ppr wff) of
+    Left (errCtx, err) -> Nothing --error err --Nothing
+    Right wff' -> Just (wffParsed wff')
+
+
+execWffRewrite :: Theory -> WffRewrite -> Maybe NumProd -> [Production'] -> Parser Wff
+execWffRewrite th re numProd prods = do
+  (x, progress) <- runProgressT $ parseWff0 (Just th) [(wffRewriteProduction re, re)] numProd prods
+  case progress of
+    NoProgress -> parseError "execWffRewrite: Nothing to rewrite"
+    MadeProgress -> return x
+
+parseWff :: Maybe NumProd -> [Production'] -> Parser Wff
+parseWff numProd = evalProgressT . parseWff0 Nothing [] numProd
 
 parseTheoryWff :: Theory -> Maybe NumProd -> Parser Wff
 parseTheoryWff th numProd = parseWff numProd (theoryProductions th)
 
-parseWffF :: forall a b. (a -> Parser (WffF b)) -> Formula a -> Parser (WffF b)
+parseWffF :: forall a b. (a -> ProgressT Parser (WffF b)) -> Formula a -> ProgressT Parser (WffF b)
 parseWffF parseMV f = go f
   where
     go' = parseWffF parseMV
 
-    parseRuleVar :: Parser String
-    parseRuleVar = parseChar '?' >> some (parseAlphaUnderscore <|> parseDigit)
+    parseRuleVar :: ProgressT Parser String
+    parseRuleVar = lift $ parseChar '?' >> some (parseAlphaUnderscore <|> parseDigit)
 
     goJuxt [] = error "parseJuxt []"
     goJuxt [p] = fmap (:[]) (go' p)
     goJuxt (p:ps) = do
       x <- go' p
-      some parseSpace
+      lift $ some parseSpace
       fmap (x:) (goJuxt ps)
 
-    go :: Formula a -> Parser (WffF b)
-    go (Terminal str) = WffTerminal <$> parseKeyword str
+    go :: Formula a -> ProgressT Parser (WffF b)
+    go (Terminal str) = WffTerminal <$> lift (parseKeyword str)
     go Empty = return WffEmpty
     go Space = return WffSpace
     go (Juxt xs) = WffJuxt <$> goJuxt xs
@@ -283,20 +325,38 @@ parseWffF parseMV f = go f
     go (FormulaAlts xs) = foldr1 (<|>) $ map go' xs
     go (MetaVar v) = parseMV v
 
-parseWff' :: Maybe NumProd -> [Production'] -> Formula' -> Parser Wff'
-parseWff' numProd ps0 f = fmap flattenWff' $ parseNumProd <|>
-  parseWffF (\(FormulaMetaVar p) ->
-      case lookupProduction ps0 p of
-        Nothing -> parseError ("Cannot find production named " <> p)
+parseWff'0 :: Maybe Theory -> [(String, WffRewrite)] -> Maybe NumProd -> [Production'] -> Formula' -> ProgressT Parser Wff'
+parseWff'0 th_maybe res numProd prods f = fmap flattenWff' $ lift parseNumProd <|>
+  flip parseWffF f (\(FormulaMetaVar p) ->
+      case lookupProduction prods p of
+        Nothing -> lift $ parseError ("Cannot find production named " <> p)
         Just rhs -> do
           traceM $ "trying production " <> ppr p
-          wff <- parseWff' numProd ps0 rhs
-          return wff) f
+          wff <- parseWff'0 th_maybe res numProd prods rhs
+          case th_maybe of
+            Nothing -> pure wff
+            Just th ->
+              case mapMaybe (\re -> runRewrite (goRewrite th re) wff) potentialRewrites of
+                [] -> pure wff
+                (wff':_) -> do
+                  put MadeProgress
+                  pure wff')
+          -- return wff) f
   where
+    potentialRewrites = map snd res
     parseNumProd =
       case numProd of
         Just np -> parseTheoryNum' np
         Nothing -> parseError "parseWff': no NumProd"
+    goRewrite :: Theory -> WffRewrite -> Rewrite Wff'
+    goRewrite th re = rewriteWithErr "wffRewriteToRewrite" $ \wff -> do
+      str <- runRewrite (wffRewriteToRewrite0 numProd prods re) (ppr wff)
+      case execParser (parseTheoryWff th numProd) str of
+        Left (errCtx, err) -> Nothing
+        Right wff' -> Just (wffParsed wff')
+
+parseWff' :: Maybe NumProd -> [Production'] -> Formula' -> Parser Wff'
+parseWff' numProd prods = evalProgressT . parseWff'0 Nothing [] numProd prods
 
 data WffVar a = WffVarName String | WffVarFilled a deriving (Show, Data, Functor, Traversable, Foldable)
 

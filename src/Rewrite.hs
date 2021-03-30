@@ -11,6 +11,7 @@ import           Control.Category
 import           Control.Monad
 import           Control.Applicative
 
+import           Control.Monad.Identity
 import           Control.Monad.State
 
 import           Data.Data
@@ -78,14 +79,24 @@ instance Monoid Progress where
   mappend NoProgress NoProgress = NoProgress
   mappend _ _ = MadeProgress
 
-newtype ProgressM a = ProgressM (State Progress a)
-  deriving (Functor, Applicative, Monad, MonadState Progress)
+newtype ProgressT m a = ProgressM (StateT Progress m a)
+  deriving (Functor, Applicative, Monad, MonadState Progress, Alternative, MonadTrans)
+
+type ProgressM = ProgressT Identity
+
+-- newtype ProgressM a = ProgressM (State Progress a)
 
 evalProgressM :: ProgressM a -> a
 evalProgressM (ProgressM p) = evalState p NoProgress
 
+evalProgressT :: Monad m => ProgressT m a -> m a
+evalProgressT (ProgressM p) = evalStateT p NoProgress
+
 runProgressM :: ProgressM a -> (a, Progress)
 runProgressM (ProgressM p) = runState p NoProgress
+
+runProgressT :: Monad m => ProgressT m a -> m (a, Progress)
+runProgressT (ProgressM p) = runStateT p NoProgress
 
 doIfNoProgress :: (a -> Maybe a) -> (a -> ProgressM a)
 doIfNoProgress f x = do
