@@ -9,16 +9,16 @@ begin theory nat
 
   rules
 
-    add_z <expr>, ( z + <expr> ):
+    add_z ( z + <expr> ):
       ( z + ?n ) ==> ?n;
 
-    add_s <expr>, ( s <expr> + <expr> ):
+    add_s ( s <expr> + <expr> ):
       ( s ?n + ?m ) ==> s ( ?n + ?m );
 
-    mul_z <expr>, ( z * <expr> ):
+    mul_z ( z * <expr> ):
       ( z * ?n ) ==> z;
 
-    mul_s <expr>, ( s <expr> * <expr> ):
+    mul_s ( s <expr> * <expr> ):
       ( s ?n * ?m ) ==> ( ?m + ( ?n * ?m ) );
 
 end theory
