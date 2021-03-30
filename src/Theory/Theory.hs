@@ -30,12 +30,12 @@ data EqRewrite = EqSym deriving (Show)
 
 data ProofStep a
   = EqStep      EqRewrite
-  | RewriteStep EqSide (Rewrite a)
+  | RewriteStep String EqSide (Rewrite a)
   -- deriving (Show)
 
 mapProofStep :: (b -> a) -> (a -> b) -> ProofStep a -> ProofStep b
 mapProofStep _ _ (EqStep r) = EqStep r
-mapProofStep f g (RewriteStep s r) = RewriteStep s (dimap f g r)
+mapProofStep f g (RewriteStep name s r) = RewriteStep name s (dimap f g r)
 
 checkEqProof :: (Show a, Eq a, Ppr a) => Equality a -> [ProofStep a] -> Either String [a]
 checkEqProof eql@(x :=: y) []
@@ -45,11 +45,11 @@ checkEqProof eql@(x :=: y) []
 
   | x == y = Right [x]
   | otherwise = Left $ "RHS and LHS not syntactically equal after rewrite rules: " ++ ppr eql
-checkEqProof eql@(x :=: y) (RewriteStep side r:rs) =
+checkEqProof eql@(x :=: y) (RewriteStep name side r:rs) =
   case runRewrite r getSide of
     Nothing -> Left (unlines ["Rewrite failed on " ++ show side ++ ": " ++ getRewriteErr r, "Final goal: " ++ ppr eql])
     Just z ->
-      trace ("Rewriting " ++ ppr x ++ " ==to==> " ++ ppr z) $
+      trace ("Rewriting with rule " ++ name ++ ": " ++ ppr x ++ " ==to==> " ++ ppr z) $
       -- trace ("  with " ++ ppr eql) $
       fmap (getSide:) (checkEqProof (setSide z) rs)
   where

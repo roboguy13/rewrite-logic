@@ -44,13 +44,13 @@ proofToRewrites (ProofRewrite side (BasicRewrite name) rest) = do
   x <- lookupRewrite name
   case x of
     Nothing -> error $ "No such theorem: " <> name
-    Just re -> fmap (RewriteStep side re:) (proofToRewrites rest)
+    Just re -> fmap (RewriteStep name side re:) (proofToRewrites rest)
 
 proofToRewrites (ProofRewrite side (OneTD name) rest) = do
   x <- lookupRewrite name
   case x of
     Nothing -> error $ "No such theorem: " <> name
-    Just re -> fmap (RewriteStep side (oneTD re):) (proofToRewrites rest)
+    Just re -> fmap (RewriteStep name side (oneTD re):) (proofToRewrites rest)
 
 proofToRewrites (ProofEqRewrite re rest) =
   fmap (EqStep re:) (proofToRewrites rest)
@@ -64,7 +64,7 @@ verifyTheoremDef (TheoremDef name thm proof) = do
 
 verifyAndPushTheoremDef :: Theory -> Def -> Verifier (Either String ())
 verifyAndPushTheoremDef th def@(TheoremDef name thm _) = do
-  traceM $ "theorem: " ++ ppr thm
+  traceM $ "\ntheorem: " ++ ppr thm
   x <- verifyTheoremDef def
   case x of
     Left err -> return $ Left err
@@ -91,7 +91,7 @@ verifyFile fileName = do
   case execParser fileParser contents of
     Left (ctx, err) -> putStrLn $ err <> "\n" <> showErrorLine (lines contents) ctx
     Right (theories@(th:_), defs) -> do
-      putStrLn $ "theory: " ++ show th
+      -- putStrLn $ "theory: " ++ show th
       case execVerifier theories (verifyDefs th defs) of
         Left err -> do
           putStrLn $ "Error: " <> err
