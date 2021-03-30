@@ -98,7 +98,9 @@ parseWffRewrite numProd prods = do
 
   uenv <- case checkSchemeMatch scheme lhs0 of
             Left err -> parseError err
-            Right x -> traceM ("got uenv: " ++ show x) *> return x
+            Right x -> do
+              -- traceM ("got uenv: " ++ show x)
+              return x
 
   lhs <- case go uenv lhs0 of
            Left err -> parseError err
@@ -146,7 +148,7 @@ checkSchemeMatch fX fY = execStateT (go fX fY) []
     go Empty Empty               = return ()
     go Space Space               = return ()
     go (MetaVar prodName) (MetaVar uvar) = do
-      traceM $ "Found uvar: " ++ ppr uvar
+      -- traceM $ "Found uvar: " ++ ppr uvar
       env <- get
       case lookup uvar env of
         Just prodName'
@@ -157,7 +159,9 @@ checkSchemeMatch fX fY = execStateT (go fX fY) []
                       ,"  Second production: " ++ show prodName
                       ]
           | otherwise -> return ()
-        Nothing -> traceM "inserting uvar..." *> modify ((uvar, prodName) :)
+        Nothing -> do
+          -- traceM "inserting uvar..."
+          modify ((uvar, prodName) :)
 
     -- TODO: Add more informative error messages for these cases
     go _ _                       = lift $ Left "In rewrite rule: Scheme and LHS do not match"
@@ -208,7 +212,7 @@ wffRewriteLhsParser numProd prods re =
           | otherwise -> return ()
         Right env' -> put env'
 
-      traceM $ "WffNamed " <> ppr unifierVar <> ": " <> show wff
+      -- traceM $ "WffNamed " <> ppr unifierVar <> ": " <> show wff
       return $ WffNamed unifierVar wff
 
 wffRewritePerform :: UnifierEnv -> Formula UnifierVar -> Wff'
@@ -222,7 +226,8 @@ wffRewritePerform uenv = go
     go (MetaVar uvar) =
       case lookupUnifierVar uvar uenv of
         Nothing -> error $ "!!! Internal error: wffRewritePerform: Cannot find UnifierVar " ++ ppr uvar ++ " in environment"
-        Just wff' -> trace ("wff' = " ++ show wff') $ wff'
+        Just wff' -> --trace ("wff' = " ++ show wff') $
+          wff'
 
     -- go (WffTerminal str) = WffTerminal str
     -- go (WffJuxt xs) = WffJuxt $ map go xs
@@ -268,8 +273,8 @@ parseWff0 th_maybe res numProd prods = foldr1 (<|>) $ map go prods
         case th_maybe of
           Nothing -> Wff <$> pure name <*> parseWff'0 th_maybe res numProd prods p
           Just th -> do
-            traceM $ "--- production:        " ++ ppr name
-            traceM $ "--- potentialRewrites: " ++ show potentialRewrites
+            -- traceM $ "--- production:        " ++ ppr name
+            -- traceM $ "--- potentialRewrites: " ++ show potentialRewrites
             wff <- parseWff'0 th_maybe res numProd prods p
             Wff <$> pure name <*>
               flip doIfNoProgressM wff (\wff1 ->
@@ -284,7 +289,7 @@ parseWff0 th_maybe res numProd prods = foldr1 (<|>) $ map go prods
 -- TODO: Avoid duplicated processing effort
 wffRewriteToRewrite :: Theory -> Maybe NumProd -> [Production'] -> WffRewrite -> Rewrite Wff'
 wffRewriteToRewrite th numProd prods re = rewriteWithErr "wffRewriteToRewrite" $ \wff -> do
-  traceM $ "ppr'd = " ++ ppr wff
+  -- traceM $ "ppr'd = " ++ ppr wff
   case execParser (execWffRewrite th re numProd prods) (ppr wff) of
     Left (errCtx, err) -> Nothing --error err --Nothing
     Right wff' -> Just (wffParsed wff')
@@ -333,7 +338,7 @@ parseWff'0 th_maybe res numProd prods f = fmap flattenWff' $ lift parseNumProd <
       case lookupProduction prods p of
         Nothing -> lift $ parseError ("Cannot find production named " <> p)
         Just rhs -> do
-          traceM $ "trying production " <> ppr p
+          -- traceM $ "trying production " <> ppr p
           wff <- parseWff'0 th_maybe res numProd prods rhs
           case th_maybe of
             Nothing -> pure wff
