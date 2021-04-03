@@ -79,11 +79,8 @@ fileParser = do
   theories <- some (many parseSpace >> parseTheory >>= \th -> some parseNewline >> return th)
   case theories of
     (th:_) -> do
-      case firstNumProd theories of
-        Nothing -> error "No numeral notation"
-        Just numProd -> do
-          defs <- parseDefs th numProd
-          return (theories, defs)
+      defs <- parseDefs th (firstNumProd theories)
+      return (theories, defs)
 
 verifyFile :: String -> IO ()
 verifyFile fileName = do

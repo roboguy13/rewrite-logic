@@ -80,7 +80,7 @@ parseSided p = lhs <|> rhs
       fmap (RHS,) p
 
 
-parseProof :: Theory -> NumProd -> Parser Proof
+parseProof :: Theory -> Maybe NumProd -> Parser Proof
 parseProof th numProd = go <|> parseQed
   where
     go = many parseSpace >> (parseSidedRewrite <|> parseEqRewrites)
@@ -99,16 +99,16 @@ parseProof th numProd = go <|> parseQed
       rest <- parseProof th numProd
       return $ ProofEqRewrite re rest
 
-parseEquality :: Theory -> NumProd -> Parser (Equality Wff)
+parseEquality :: Theory -> Maybe NumProd -> Parser (Equality Wff)
 parseEquality th numProd = do
-  x <- parseTheoryWff th (Just numProd)
+  x <- parseTheoryWff th numProd
   many parseSpace
   parseChar '='
   many parseSpace
-  y <- parseTheoryWff th (Just numProd)
+  y <- parseTheoryWff th numProd
   return (x :=: y)
 
-parseTheorem :: Theory -> NumProd -> Parser Def
+parseTheorem :: Theory -> Maybe NumProd -> Parser Def
 parseTheorem th numProd = do
   parseKeyword "theorem"
   some parseSpace
@@ -130,7 +130,7 @@ parseTheorem th numProd = do
 
   return (TheoremDef name (wffParsed x :=: wffParsed y) proof)
 
-parseDefs :: Theory -> NumProd -> Parser [Def]
+parseDefs :: Theory -> Maybe NumProd -> Parser [Def]
 parseDefs th numProd = do
   x <- parseTheorem th numProd
   xs <- (some parseNewline >> parseDefs th numProd) <|> fmap (const []) parseEOF
