@@ -1,0 +1,17 @@
+begin theory miu
+
+    <miu> ::= M <miu> | I <miu> | U <miu> | M | I | U;
+    <puzzle> ::= ( M <miu> ) | ( I <miu> ) | ( U <miu> );
+
+  rules
+
+    rule1 ( <miu> I ):
+      ( ?x I )  ==>  ( ?x I U );
+
+end theory
+
+theorem example1 : ( M I ) = ( M I U )
+proof
+  lhs: rewrite rule1 with <miu> [ ?x := M ]
+qed
+

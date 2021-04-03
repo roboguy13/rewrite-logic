@@ -5,33 +5,42 @@ module Verify where
 import           Rewrite
 import           Theorem
 import           Theory.Theory
+import           Theory.Formula
 import           Theory.Type
 import           Parser
 import           Ppr
 
 import           Control.Monad.State
+import           Control.Monad.Reader
 import           Control.Applicative
 
 import Debug.Trace
 
-newtype Verifier a = Verifier { runVerifier :: State [(String, Rewrite Wff')] a }
-  deriving (Functor, Applicative, Monad, MonadState [(String, Rewrite Wff')])
+newtype Verifier a = Verifier { runVerifier :: ReaderT (Maybe NumProd, [Production']) (State [(String, WffRewrite)]) a }
+  deriving (Functor, Applicative, Monad, MonadState [(String, WffRewrite)], MonadReader (Maybe NumProd, [Production']))
 
 execVerifier :: [Theory] -> Verifier a -> a
-execVerifier ths = flip evalState (concatMap go ths) . runVerifier
+execVerifier ths = flip evalState (concatMap go ths) . flip runReaderT (foldr (<|>) Nothing $ map theoryNumNotation ths, concatMap theoryProductions ths) . runVerifier
   where
-    go :: Theory -> [(String, Rewrite Wff')]
-    go th = map (\re -> (wffRewriteName re, wffRewriteToRewrite th (theoryNumNotation th) (theoryProductions th) re)) (theoryRules th)
+    go :: Theory -> [(String, WffRewrite)]
+    go th = map (\re -> (wffRewriteName re, re)) (theoryRules th)
+    -- go th = map (\re -> (wffRewriteName re, wffRewriteToRewrite th (theoryNumNotation th) (theoryProductions th) re)) (theoryRules th)
 
-lookupRewrite :: String -> Verifier (Maybe (Rewrite Wff'))
+lookupRewrite :: String -> Verifier (Maybe WffRewrite)
 lookupRewrite name = do
   assocs <- get
   return $ lookup name assocs
 
-insertRewrite :: String -> Rewrite Wff' -> Verifier ()
+insertRewrite :: String -> WffRewrite -> Verifier ()
 insertRewrite name re = do
   assocs <- get
   put ((name, re):assocs)
+
+processRewrite :: WffRewrite -> Verifier (Rewrite Wff')
+processRewrite re = do
+  (numProd, prods) <- ask
+
+  return $ wffRewriteToRewrite numProd prods re
 
 proofToRewrites :: Proof -> Verifier [ProofStep Wff']
 proofToRewrites Qed = return []
@@ -40,17 +49,21 @@ proofToRewrites Qed = return []
 --     CbvStep -> fmap (RewriteStep side cbvStep :) (proofToRewrites rest)
 --     FullCbv -> fmap (RewriteStep side fullCbv :) (proofToRewrites rest)
 
-proofToRewrites (ProofRewrite side (BasicRewrite name) rest) = do
+proofToRewrites (ProofRewrite side (BasicRewrite name withClause) rest) = do
   x <- lookupRewrite name
   case x of
     Nothing -> error $ "No such theorem: " <> name
-    Just re -> fmap (RewriteStep name side re:) (proofToRewrites rest)
+    Just re0 -> do
+      re <- processRewrite $ setWithClause re0 withClause
+      fmap (RewriteStep name side re:) (proofToRewrites rest)
 
-proofToRewrites (ProofRewrite side (OneTD name) rest) = do
+proofToRewrites (ProofRewrite side (OneTD name withClause) rest) = do
   x <- lookupRewrite name
   case x of
     Nothing -> error $ "No such theorem: " <> name
-    Just re -> fmap (RewriteStep name side (oneTD re):) (proofToRewrites rest)
+    Just re0 -> do
+      re <- processRewrite $ setWithClause re0 withClause
+      fmap (RewriteStep name side (oneTD re):) (proofToRewrites rest)
 
 proofToRewrites (ProofEqRewrite re rest) =
   fmap (EqStep re:) (proofToRewrites rest)
@@ -68,8 +81,11 @@ verifyAndPushTheoremDef th def@(TheoremDef name thm _) = do
   x <- verifyTheoremDef def
   case x of
     Left err -> return $ Left err
-    Right _ -> do
-      fmap Right $ insertRewrite name (wff'EqToRewrite th thm)
+    Right _ ->
+      case wff'EqToRewrite name thm of
+        Nothing -> return $ Left $ "wff'EqToRewrite failed for theorem " ++ name
+        Just re0 ->
+          fmap Right $ insertRewrite name re0
 
 verifyDefs :: Theory -> [Def] -> Verifier (Either String ())
 verifyDefs th defs = fmap sequence_ $ mapM (verifyAndPushTheoremDef th) defs
@@ -79,7 +95,7 @@ fileParser = do
   theories <- some (many parseSpace >> parseTheory >>= \th -> some parseNewline >> return th)
   case theories of
     (th:_) -> do
-      defs <- parseDefs th (firstNumProd theories)
+      defs <- parseDefs (firstNumProd theories) (concatMap theoryProductions theories)
       return (theories, defs)
 
 verifyFile :: String -> IO ()
